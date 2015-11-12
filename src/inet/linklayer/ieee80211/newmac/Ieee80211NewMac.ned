@@ -87,6 +87,7 @@ module Ieee80211NewMac extends MACProtocolBase like IIeee80211Mac
                                           // "auto". "auto" values will be replaced by
                                           // a generated MAC address in init stage 0.
         string rateControlModuleType = default("");
+        string aMsduAggregatorModuleType = default("");
         string upperMacModule = ".upperMac";
         string rxModule = ".rx";
         string txModule = ".tx";
@@ -96,6 +97,7 @@ module Ieee80211NewMac extends MACProtocolBase like IIeee80211Mac
         string rateSelectionModule = ".rateSelection";
         string rateControlModule = ".rateControl";
         string statisticsModule = ".statistics";
+        string msduAggregatorModule = ".msduAggregator";
 
         *.macModule = "^";
         *.upperMacModule = "^" + upperMacModule;
@@ -106,6 +108,7 @@ module Ieee80211NewMac extends MACProtocolBase like IIeee80211Mac
         *.rateSelectionModule = "^" + rateSelectionModule;
         *.rateControlModule = "^" + rateControlModule;
         *.statisticsModule = "^" + statisticsModule;
+        *.msduAggregatorModule = "^" + msduAggregatorModule;
 
         @display("i=block/layer;bgb=721,355");
         @class(Ieee80211NewMac);
@@ -115,6 +118,9 @@ module Ieee80211NewMac extends MACProtocolBase like IIeee80211Mac
         @statistic[rcvdPkFromLL](title="packets received from lower layer"; source=packetReceivedFromLower; record=count,"sum(packetBytes)","vector(packetBytes)"; interpolationmode=none);
 
     submodules:
+        msduAggregator: <aMsduAggregatorModuleType> like IMsduAggregation if aMsduAggregatorModuleType != "" {
+            @display("p=42,45");
+        }
         rateSelection: <default("BasicRateSelection")> like IRateSelection {
             @display("p=492,66");
         }
