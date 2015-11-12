@@ -183,6 +183,7 @@ packet Ieee80211DataFrame extends Ieee80211DataOrMgmtFrame
     uint16 qos;             // TODO nobody uses this currently, only its parts like tid below... 
     int ackPolicy @enum(AckPolicy); //FIXME in real life this is part of the optional qos field above...
     uint8 tid; //FIXME in real life this is part of the optional qos field above...
+    bool aMsduPresent = false; // 8.2.4.5.9 A-MSDU Present subfield FIXME in real life this is part of the optional qos field above...
 }
 
 //TODO this can be introduced when the SNAP header 
@@ -211,4 +212,17 @@ packet Ieee80211ManagementFrame extends Ieee80211DataOrMgmtFrame
 {
     short Category;
     //short action @enum(WirelessNetworkManagementAction); // action
+}
+
+packet Ieee80211MsduSubframe
+{
+    bitLength = LENGTH_A_MSDU_SUBFRAME_HEADER;
+    MACAddress sa; // source addr.
+    MACAddress da; // destination addr.
+    int length;
+}
+
+packet Ieee80211AMsdu
+{
+    Ieee80211MsduSubframe subframes[];
 }
