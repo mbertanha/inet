@@ -26,6 +26,7 @@
 #include "MacParameters.h"
 #include "FrameExchanges.h"
 #include "DuplicateDetectors.h"
+#include "MsduAggregation.h"
 #include "IFragmentation.h"
 #include "IRateSelection.h"
 #include "IRateControl.h"
@@ -66,6 +67,7 @@ void DcfUpperMac::initialize()
     transmissionQueue.setup(par("prioritizeMulticast") ? (CompareFunc)MacUtils::cmpMgmtOverMulticastOverUnicast : (CompareFunc)MacUtils::cmpMgmtOverData);
 
     rateSelection = check_and_cast<IRateSelection*>(getModuleByPath(par("rateSelectionModule")));
+    msduAggregator = dynamic_cast<IMsduAggregation*>(getModuleByPath(par("msduAggregatorModule")));
     rateControl = dynamic_cast<IRateControl*>(getModuleByPath(par("rateControlModule"))); // optional module
     rateSelection->setRateControl(rateControl);
 
@@ -121,7 +123,6 @@ void DcfUpperMac::upperFrameReceived(Ieee80211DataOrMgmtFrame *frame)
 {
     Enter_Method("upperFrameReceived(\"%s\")", frame->getName());
     take(frame);
-
     EV_INFO << "Frame " << frame << " received from higher layer, receiver = " << frame->getReceiverAddress() << endl;
 
     if (maxQueueSize > 0 && transmissionQueue.length() >= maxQueueSize && dynamic_cast<Ieee80211DataFrame *>(frame)) {
@@ -129,26 +130,52 @@ void DcfUpperMac::upperFrameReceived(Ieee80211DataOrMgmtFrame *frame)
         delete frame;
         return;
     }
-
     ASSERT(!frame->getReceiverAddress().isUnspecified());
     frame->setTransmitterAddress(params->getAddress());
-    duplicateDetection->assignSequenceNumber(frame);
-
-    if (frame->getByteLength() <= fragmentationThreshold)
-        enqueue(frame);
-    else {
-        auto fragments = fragmenter->fragment(frame, fragmentationThreshold);
-        for (Ieee80211DataOrMgmtFrame *fragment : fragments)
-            enqueue(fragment);
-    }
+    enqueue(frame);
+    if (!contention[0]->isContentionInProgress())
+        startContention();
 }
 
 void DcfUpperMac::enqueue(Ieee80211DataOrMgmtFrame *frame)
 {
-    if (frameExchange)
-        transmissionQueue.insert(frame);
+    transmissionQueue.insert(frame);
+}
+
+Ieee80211DataOrMgmtFrame* DcfUpperMac::dequeue()
+{
+    Enter_Method("dequeue()");
+    Ieee80211DataOrMgmtFrame *nextFrame;
+    // Note: In DCF compliant mode there is no MSDU aggregation.
+    if (msduAggregator)
+        nextFrame = check_and_cast<Ieee80211DataOrMgmtFrame *>(msduAggregator->createAggregateFrame(&transmissionQueue));
     else
-        startSendDataFrameExchange(frame, 0, AC_LEGACY);
+        nextFrame = check_and_cast<Ieee80211DataOrMgmtFrame *>(transmissionQueue.pop());
+    EV_INFO << nextFrame << " is selected from the transmission queue." << std::endl;
+    duplicateDetection->assignSequenceNumber(nextFrame);
+    Ieee80211DataFrame *nextDataFrame = dynamic_cast<Ieee80211DataFrame *>(nextFrame);
+    bool aMsduPresent = nextDataFrame && nextDataFrame->getAMsduPresent();
+    if (aMsduPresent)
+        EV_INFO << "It is an " <<  nextFrame->getByteLength() << " octets long A-MSDU aggregated frame." << std::endl;
+    if (nextFrame->getByteLength() > fragmentationThreshold && !aMsduPresent)
+    {
+        EV_INFO << "The frame length is " << nextFrame->getByteLength() << " octets. Fragmentation threshold is reached. Fragmenting..." << std::endl;
+        auto fragments = fragmenter->fragment(nextFrame, fragmentationThreshold);
+        EV_INFO << "The fragmentation process finished with " << fragments.size() << "fragments." << std::endl;
+        if (transmissionQueue.isEmpty())
+        {
+            for (Ieee80211DataOrMgmtFrame *fragment : fragments)
+                transmissionQueue.insert(fragment);
+        }
+        else
+        {
+            cObject *where = transmissionQueue.front();
+            for (Ieee80211DataOrMgmtFrame *fragment : fragments)
+                transmissionQueue.insertBefore(where, fragment);
+        }
+        return (Ieee80211DataOrMgmtFrame*) transmissionQueue.pop();
+    }
+    return nextFrame;
 }
 
 void DcfUpperMac::lowerFrameReceived(Ieee80211Frame *frame)
@@ -184,7 +211,19 @@ void DcfUpperMac::lowerFrameReceived(Ieee80211Frame *frame)
                 delete dataOrMgmtFrame;
             }
             else {
-                if (!utils->isFragment(dataOrMgmtFrame))
+                Ieee80211DataFrame *dataFrame = dynamic_cast<Ieee80211DataFrame*>(dataOrMgmtFrame);
+                if (dataFrame && dataFrame->getAMsduPresent())
+                {
+                    EV_INFO << "MSDU aggregated frame received. Exploding it...\n";
+                    auto frames = msduAggregator->explodeAggregateFrame(dataFrame);
+                    EV_INFO << "It contained the following subframes:\n";
+                    for (Ieee80211DataFrame *frame : frames)
+                    {
+                        EV_INFO << frame << "\n";
+                        mac->sendUp(frame);
+                    }
+                }
+                else if (!utils->isFragment(dataOrMgmtFrame))
                     mac->sendUp(dataOrMgmtFrame);
                 else {
                     Ieee80211DataOrMgmtFrame *completeFrame = reassembly->addFragment(dataOrMgmtFrame);
@@ -206,18 +245,18 @@ void DcfUpperMac::corruptedFrameReceived()
         frameExchange->corruptedOrNotForUsFrameReceived();
 }
 
-void DcfUpperMac::channelAccessGranted(IContentionCallback *callback, int txIndex)
+void DcfUpperMac::channelAccessGranted(int txIndex)
 {
     Enter_Method("channelAccessGranted()");
-    callback->channelAccessGranted(txIndex);
+    startSendDataFrameExchange(dequeue(), 0, AC_LEGACY);
 }
 
-void DcfUpperMac::internalCollision(IContentionCallback *callback, int txIndex)
+void DcfUpperMac::internalCollision(int txIndex)
 {
     Enter_Method("internalCollision()");
-    if (callback)
-        callback->internalCollision(txIndex);
+    throw cRuntimeError("Impossible event: internal collision in DcfUpperMac");
 }
+
 
 void DcfUpperMac::transmissionComplete(ITxCallback *callback)
 {
@@ -251,7 +290,7 @@ void DcfUpperMac::startSendDataFrameExchange(Ieee80211DataOrMgmtFrame *frame, in
         frameExchange = new SendDataWithRtsCtsFrameExchange(&context, this, frame, txIndex, ac);
     else
         frameExchange = new SendDataWithAckFrameExchange(&context, this, frame, txIndex, ac);
-
+    contention[0]->setContentionCallback((IContentionCallback*)frameExchange);
     frameExchange->start();
 }
 
@@ -260,12 +299,15 @@ void DcfUpperMac::frameExchangeFinished(IFrameExchange *what, bool successful)
     EV_INFO << "Frame exchange finished" << std::endl;
     delete frameExchange;
     frameExchange = nullptr;
-
-    if (!transmissionQueue.empty()) {
-        Ieee80211DataOrMgmtFrame *frame = check_and_cast<Ieee80211DataOrMgmtFrame *>(transmissionQueue.pop());
-        startSendDataFrameExchange(frame, 0, AC_LEGACY);
-    }
+    if (!transmissionQueue.empty())
+        startContention();
 }
+
+void DcfUpperMac::startContention()
+{
+    contention[0]->startContention(params->getAifsTime(AC_LEGACY), params->getEifsTime(AC_LEGACY), params->getCwMulticast(AC_LEGACY), params->getCwMulticast(AC_LEGACY), params->getSlotTime(), 0, this);
+}
+
 
 void DcfUpperMac::sendAck(Ieee80211DataOrMgmtFrame *frame)
 {

@@ -49,8 +49,6 @@ class INET_API IUpperMac
         virtual void corruptedFrameReceived() = 0;
 
         // from Tx:
-        virtual void channelAccessGranted(IContentionCallback *callback, int txIndex) = 0;
-        virtual void internalCollision(IContentionCallback *callback, int txIndex) = 0;
         virtual void transmissionComplete(ITxCallback *callback) = 0;
 };
 

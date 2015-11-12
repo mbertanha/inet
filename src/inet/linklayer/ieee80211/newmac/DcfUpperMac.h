@@ -23,6 +23,7 @@
 #include "IUpperMac.h"
 #include "IFrameExchange.h"
 #include "AccessCategory.h"
+#include "ITxCallback.h"
 #include "inet/physicallayer/ieee80211/mode/IIeee80211Mode.h"
 
 using namespace inet::physicallayer;
@@ -46,11 +47,12 @@ class IReassembly;
 class IRateSelection;
 class IRateControl;
 class IStatistics;
+class IMsduAggregation;
 
 /**
  * UpperMac for DCF mode.
  */
-class INET_API DcfUpperMac : public cSimpleModule, public IUpperMac, protected IFrameExchange::IFinishedCallback
+class INET_API DcfUpperMac : public cSimpleModule, public IUpperMac, public IContentionCallback, protected IFrameExchange::IFinishedCallback
 {
     public:
         typedef std::list<Ieee80211DataOrMgmtFrame*> Ieee80211DataOrMgmtFrameList;
@@ -69,6 +71,7 @@ class INET_API DcfUpperMac : public cSimpleModule, public IUpperMac, protected I
         cQueue transmissionQueue;
         IFrameExchange *frameExchange = nullptr;
         IDuplicateDetector *duplicateDetection = nullptr;
+        IMsduAggregation *msduAggregator = nullptr;
         IFragmenter *fragmenter = nullptr;
         IReassembly *reassembly = nullptr;
         IRateSelection *rateSelection = nullptr;
@@ -81,8 +84,10 @@ class INET_API DcfUpperMac : public cSimpleModule, public IUpperMac, protected I
         void handleMessage(cMessage *msg) override;
 
         virtual void enqueue(Ieee80211DataOrMgmtFrame *frame);
+        virtual Ieee80211DataOrMgmtFrame *dequeue();
         virtual void startSendDataFrameExchange(Ieee80211DataOrMgmtFrame *frame, int txIndex, AccessCategory ac);
         virtual void frameExchangeFinished(IFrameExchange *what, bool successful) override;
+        virtual void startContention();
 
         void sendAck(Ieee80211DataOrMgmtFrame *frame);
         void sendCts(Ieee80211RTSFrame *frame);
@@ -93,9 +98,9 @@ class INET_API DcfUpperMac : public cSimpleModule, public IUpperMac, protected I
         virtual void upperFrameReceived(Ieee80211DataOrMgmtFrame *frame) override;
         virtual void lowerFrameReceived(Ieee80211Frame *frame) override;
         virtual void corruptedFrameReceived() override;
-        virtual void channelAccessGranted(IContentionCallback *callback, int txIndex) override;
-        virtual void internalCollision(IContentionCallback *callback, int txIndex) override;
         virtual void transmissionComplete(ITxCallback *callback) override;
+        virtual void channelAccessGranted(int txIndex) override;
+        virtual void internalCollision(int txIndex) override;
 };
 
 } // namespace ieee80211
