@@ -244,8 +244,10 @@ IFrameExchange::FrameProcessingResult StepBasedFrameExchange::lowerFrameReceived
         if (status == INPROGRESS) {
             logStatus(result == IGNORED ? "processReply(): frame IGNORED": "processReply(): frame PROCESSED");
             checkOperation(operation, "processReply()");
-            if (result == PROCESSED_KEEP || result == PROCESSED_DISCARD || operation != NONE)
+            if (result == PROCESSED_KEEP || result == PROCESSED_DISCARD || operation != NONE) {
+                cancelEvent(timeoutMsg);
                 proceed();
+            }
             else
                 operation = EXPECT_FULL_REPLY; // restore
         }
@@ -261,6 +263,7 @@ IFrameExchange::FrameProcessingResult StepBasedFrameExchange::lowerFrameReceived
             logStatus(result == IGNORED ? "processReply(): frame IGNORED": "processReply(): frame PROCESSED");
             checkOperation(operation, "processReply()");
             if (result == PROCESSED_KEEP || result == PROCESSED_DISCARD || operation != NONE) {
+                cancelEvent(timeoutMsg);
                 proceed();
             }
             else {
@@ -291,7 +294,6 @@ void StepBasedFrameExchange::handleSelfMessage(cMessage *msg)
     EV_DETAIL << "Timeout in step " << step << "\n";
     ASSERT(status == INPROGRESS);
     ASSERT(msg == timeoutMsg);
-
     if (operation == EXPECT_FULL_REPLY) {
         handleTimeout();
     }
