@@ -376,7 +376,7 @@ packet Ieee80211BasicBlockAck extends Ieee80211BlockAck
     // The BA Information field of the Basic BlockAck frame comprises the Block Ack Starting Sequence Control
     // subfield and the Block Ack Bitmap subfield, as shown in Figure 8-26.
 
-    int fragmentNumber;
+    int fragmentNumber = 0; // ??
     int startingSequenceNumber;
     // The Block Ack Bitmap subfield is 128 octets in length and is used to indicate the received status of up to
     // 64 MSDUs. Bit position n of the Block Ack bitmap, if equal to 1, acknowledges receipt of an MPDU with an
@@ -404,7 +404,7 @@ packet Ieee80211CompressedBlockAck extends Ieee80211BlockAck
     // The BA Information field of the Compressed BlockAck frame comprises the Block Ack Starting Sequence
     // Control subfield and the Block Ack Bitmap subfield, as shown in Figure 8-27.
 
-    int fragmentNumber;
+    int fragmentNumber = 0;
     int startingSequenceNumber;
     BitVector blockAckBitmap; // 64 bits
 
