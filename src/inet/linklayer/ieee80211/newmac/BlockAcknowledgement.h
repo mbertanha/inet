@@ -39,15 +39,16 @@ class INET_API BlockAcknowledgmentSendSessions
         class INET_API Session {
             private:
                 bool aMsduSupported;
-                int beginSequenceNumber;
+                int startingSequenceNumber;
                 int txWindowSize;
-                std::vector<Ieee80211DataOrMgmtFrame*> resendBuffer;
-                simtime_t lastUseTime;
+                std::vector<Ieee80211DataOrMgmtFrame*> transmittedFrames;
+                simtime_t lastUseTime; // ?
+
             public:
                 Session(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response);
                 virtual ~Session();
-                virtual void addFrameToSend(Ieee80211DataOrMgmtFrame *frame);
-                virtual void framesAcknowledged(std::vector<int> ackedSequenceNumbers); // better, use a bitmap like the one in the BA frame
+                virtual void addFrameToTransmittedFrames(Ieee80211DataOrMgmtFrame *frame);
+                virtual void framesAcknowledged(std::vector<int> ackedSequenceNumbers);
                 virtual std::vector<Ieee80211DataOrMgmtFrame*> getFramesToRetransmit();
         };
 

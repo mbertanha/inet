@@ -82,21 +82,21 @@ BlockAcknowledgmentSendSessions::Session::Session(Ieee80211AddbaRequest *request
     else if (response->getBufferSize() < request->getBufferSize())
         txWindowSize = response->getBufferSize();
     txWindowSize = std::min(64, txWindowSize);
+    startingSequenceNumber = request->getStartingSequenceNumber();
     // Once the Block Ack exchange has been set up, data and ACK frames are transferred using the procedure
     // described in 9.21.3.
 }
 
 BlockAcknowledgmentSendSessions::Session::~Session()
 {
-    for (auto frame : resendBuffer)
+    for (auto frame : transmittedFrames)
         delete frame;
 }
 
-void BlockAcknowledgmentSendSessions::Session::addFrameToSend(Ieee80211DataOrMgmtFrame *frame)
+void BlockAcknowledgmentSendSessions::Session::addFrameToTransmittedFrames(Ieee80211DataOrMgmtFrame *frame)
 {
     lastUseTime = simTime();
-    int seqNum = frame->getSequenceNumber();
-    //TODO
+    transmittedFrames.push_back(frame);
 }
 
 void BlockAcknowledgmentSendSessions::Session::framesAcknowledged(std::vector<int> ackedSequenceNumbers)
