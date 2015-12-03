@@ -199,8 +199,15 @@ packet Ieee80211DataFrameWithSNAP extends Ieee80211DataFrame
 //
 packet Ieee80211ManagementFrame extends Ieee80211DataOrMgmtFrame
 {
-    short Category;
-    //short action @enum(WirelessNetworkManagementAction); // action
+}
+
+// 8.3.3.13 Action frame format -- mgmt frame with subtype action
+packet Ieee80211ActionFrame extends Ieee80211DataOrMgmtFrame
+{
+    type = ST_ACTION;
+    short category;
+    // TODO: subclasses will add action subfield contents
+    //short action @enum(WirelessNetworkManagementAction); // action TODO: remove it
 }
 
 packet Ieee80211MsduSubframe
@@ -214,4 +221,51 @@ packet Ieee80211MsduSubframe
 packet Ieee80211AMsdu
 {
     Ieee80211MsduSubframe subframes[];
+}
+
+// Table 8-203—ADDBA Request frame Action field format -- 736p.
+packet Ieee80211AddbaRequest extends Ieee80211ActionFrame
+{
+    // byteLength TODO
+    category = 3; // representing Block Ack
+    int blockAckAction = 0; // representing ADDBA request
+    int dialogToken = 1; // nonzero, arbitrary
+
+    // Block Ack Parameter Set field
+    bool aMsduSupported; // The A-MSDU Supported subfield determines whether an A-MSDU may be carried in a QoS data MPDU sent under this Block Ack agreement.
+    bool blockAckPolicy; // The Block Ack Policy subfield is set to 1 for immediate Block Ack and 0 for delayed Block Ack.
+    int tid; // The TID subfield contains the value of the TC or TS for which the BlockAck is being requested.
+    int bufferSize; // The Buffer Size subfield indicates the number of buffers available for this particular TID
+
+    // Block Ack Timeout Value field
+    // The Block Ack Timeout Value field contains the duration, in TUs, after which the Block Ack setup is
+    // terminated, if there are no frame exchanges (see 10.5.4) within this duration using this Block Ack
+    //  agreement. A value of 0 disables the timeout.
+    simtime_t blockAckTimeoutValue;
+
+    // Block Ack Starting Sequence Control
+    int _fragmentNumber; // FIXME: DataOrMgmtFreme has a fragmentNumber
+    int startingSequenceNumber; // the sequence number of the first MSDU
+
+}
+
+packet Ieee80211AddbaResponse extends Ieee80211ActionFrame
+{
+    // byteLength TODO
+    category = 3; // representing Block Ack
+    int blockAckAction = 1; // representing ADDBA response
+    int dialogToken = 1; // The Dialog Token field value is copied from the corresponding received ADDBA Request frame.
+    int statusCode; // The Status Code field is used in a response management frame to indicate the success or failure of a requested operation.
+
+    // Block Ack Parameter Set field
+    bool aMsduSupported; // The A-MSDU Supported subfield determines whether an A-MSDU may be carried in a QoS data MPDU sent under this Block Ack agreement.
+    bool blockAckPolicy; // The Block Ack Policy subfield is set to 1 for immediate Block Ack and 0 for delayed Block Ack.
+    int tid; // The TID subfield contains the value of the TC or TS for which the BlockAck is being requested.
+    int bufferSize; // The Buffer Size subfield indicates the number of buffers available for this particular TID
+
+    // Block Ack Timeout Value field
+    // The Block Ack Timeout Value field contains the duration, in TUs, after which the Block Ack setup is
+    // terminated, if there are no frame exchanges (see 10.5.4) within this duration using this Block Ack
+    //  agreement. A value of 0 disables the timeout.
+    simtime_t blockAckTimeoutValue;
 }
