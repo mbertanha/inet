@@ -22,9 +22,11 @@ cplusplus {{
 #include "inet/linklayer/ieee80211/mac/Ieee80211Consts.h"
 #include "inet/linklayer/common/MACAddress.h"
 #include "inet/linklayer/common/Ieee802Ctrl_m.h" // for ~EtherType
+#include "inet/common/BitVector.h"
 }}
 
 class noncobject MACAddress;
+class noncobject BitVector;
 
 enum EtherType;
 
@@ -223,7 +225,9 @@ packet Ieee80211AMsdu
     Ieee80211MsduSubframe subframes[];
 }
 
+//
 // Table 8-203—ADDBA Request frame Action field format -- 736p.
+//
 packet Ieee80211AddbaRequest extends Ieee80211ActionFrame
 {
     // byteLength TODO
@@ -268,4 +272,75 @@ packet Ieee80211AddbaResponse extends Ieee80211ActionFrame
     // terminated, if there are no frame exchanges (see 10.5.4) within this duration using this Block Ack
     //  agreement. A value of 0 disables the timeout.
     simtime_t blockAckTimeoutValue;
+}
+
+//
+// 8.3.1.9 BlockAck frame format -- 410p.
+//
+packet Ieee80211BlockAck extends Ieee80211OneAddressFrame
+{
+    // byteLength TODO
+    // The RA field of the BlockAck frame is the address of the recipient STA that requested the Block Ack.
+    // The TA field is the address of the STA transmitting the BlockAck frame.
+    type = ST_BLOCKACK;
+
+    // BA Control
+    bool blockAckPolicy; // Table 8-17—BA Ack Policy subfield: 0-Normal Acknowledgment, 1-No Acknowledgment.
+
+    // Table 8-18—BlockAck frame variant encoding
+    bool multiTid;
+    bool compressedBitmap;
+}
+
+//
+// 8.3.1.9.2 Basic BlockAck variant -- 411p.
+//
+packet Ieee80211BasicBlockAck extends Ieee80211BlockAck
+{
+    // byteLength TODO
+    multiTid = 0;
+    compressedBitmap = 0;
+
+    // The BA Information field of the Basic BlockAck frame comprises the Block Ack Starting Sequence Control
+    // subfield and the Block Ack Bitmap subfield, as shown in Figure 8-26.
+
+    int fragmentNumber;
+    int startingSequenceNumber;
+    // The Block Ack Bitmap subfield is 128 octets in length and is used to indicate the received status of up to
+    // 64 MSDUs. Bit position n of the Block Ack bitmap, if equal to 1, acknowledges receipt of an MPDU with an
+    // MPDU sequence control value equal to (Block Ack Starting Sequence Control + n). Bit position n of the
+    // Block Ack bitmap, if equal to 0, indicates that an MPDU with MPDU sequence control value equal to
+    // (Block Ack Starting Sequence Control + n) has not been received. Each of the MPDU Sequence Control
+    // field and Block Ack Starting Sequence Control subfield values are treated as a 16-bit unsigned integer. For
+    // unused fragment numbers of an MSDU, the corresponding bits in the bitmap are set to 0.
+    BitVector blockAckBitmap[64]; // 64 * 16 bitmatrix
+}
+
+//
+// 8.3.1.9.3 Compressed BlockAck variant
+//
+packet Ieee80211CompressedBlockAck extends Ieee80211BlockAck
+{
+    // byteLength TODO
+    multiTid = 0;
+    compressedBitmap = 1;
+
+    // The BA Information field of the Compressed BlockAck frame comprises the Block Ack Starting Sequence
+    // Control subfield and the Block Ack Bitmap subfield, as shown in Figure 8-27.
+
+    int fragmentNumber;
+    int startingSequenceNumber;
+    BitVector blockAckBitmap; // 64 bits
+}
+
+//
+// 8.3.1.9.4 Multi-TID BlockAck variant
+//
+packet Ieee80211MultiTidBlockAck extends Ieee80211BlockAck
+{
+    // byteLength TODO
+    multiTid = 1;
+    compressedBitmap = 1;
+
+    // TODO: unimplemented
 }
