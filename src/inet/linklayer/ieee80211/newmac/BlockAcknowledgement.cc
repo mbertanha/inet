@@ -19,6 +19,7 @@
 
 #include "BlockAcknowledgement.h"
 #include "inet/linklayer/ieee80211/mac/Ieee80211Frame_m.h"
+#include "inet/common/BitVector.h"
 
 namespace inet {
 namespace ieee80211 {
@@ -95,12 +96,39 @@ BlockAcknowledgmentSendSessions::Session::~Session()
 
 void BlockAcknowledgmentSendSessions::Session::addFrameToTransmittedFrames(Ieee80211DataOrMgmtFrame *frame)
 {
-    lastUseTime = simTime();
     transmittedFrames.push_back(frame);
 }
 
-void BlockAcknowledgmentSendSessions::Session::framesAcknowledged(std::vector<int> ackedSequenceNumbers)
+void BlockAcknowledgmentSendSessions::blockAckReceived(Ieee80211BlockAck *blockAck)
 {
+    int tid;
+    if (blockAck->getMultiTid() == 0 && blockAck->getCompressedBitmap() == 0) // Note: fragments are supported
+    {
+        Ieee80211BasicBlockAck *basicBlockAck = dynamic_cast<Ieee80211BasicBlockAck*>(blockAck);
+        tid = basicBlockAck->getTidInfo();
+        Session *session = getSession(basicBlockAck->getTransmitterAddress(), tid);
+        std::vector<Ieee80211DataOrMgmtFrame*> transmittedFrames = session->getTransmittedFrames();
+        for (int i = 0; i < basicBlockAck->getBlockAckBitmapArraySize(); i++)
+        {
+            BitVector ackedFrames = basicBlockAck->getBlockAckBitmap(i);
+            for (int i = 0; i < transmittedFrames.size(); i++)
+            {
+
+            }
+        }
+    }
+    else if (blockAck->getMultiTid() == 0 && blockAck->getCompressedBitmap() == 1) // Note: fragments are not supported
+    {
+        Ieee80211CompressedBlockAck *compressedBlockAck = dynamic_cast<Ieee80211CompressedBlockAck*>(blockAck);
+        tid = compressedBlockAck->getTidInfo();
+        Session *session = getSession(compressedBlockAck->getTransmitterAddress(), tid);
+        BitVector ackedFrames = compressedBlockAck->getBlockAckBitmap();
+        // TODO:
+    }
+    else if (blockAck->getMultiTid() == 1 && blockAck->getCompressedBitmap() == 1)
+        throw cRuntimeError("MultiTid BlockAck is unsupported.");
+    else
+        throw cRuntimeError("Unknown BlockAck variant");
 }
 
 std::vector<Ieee80211DataOrMgmtFrame*> BlockAcknowledgmentSendSessions::Session::getFramesToRetransmit()

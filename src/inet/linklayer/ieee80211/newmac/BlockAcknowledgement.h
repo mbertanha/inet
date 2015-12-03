@@ -32,7 +32,6 @@ class Ieee80211DataOrMgmtFrame;
 /**
  * Data structure for managing the sender side of a Block Acknowledgment session.
  */
-//TODO: deal with fragmentation too? (use <seq,frag> instead of <seq>)
 class INET_API BlockAcknowledgmentSendSessions
 {
     public:
@@ -42,13 +41,12 @@ class INET_API BlockAcknowledgmentSendSessions
                 int startingSequenceNumber;
                 int txWindowSize;
                 std::vector<Ieee80211DataOrMgmtFrame*> transmittedFrames;
-                simtime_t lastUseTime; // ?
 
             public:
                 Session(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response);
                 virtual ~Session();
                 virtual void addFrameToTransmittedFrames(Ieee80211DataOrMgmtFrame *frame);
-                virtual void framesAcknowledged(std::vector<int> ackedSequenceNumbers);
+                virtual std::vector<Ieee80211DataOrMgmtFrame*>& getTransmittedFrames();
                 virtual std::vector<Ieee80211DataOrMgmtFrame*> getFramesToRetransmit();
         };
 
@@ -68,6 +66,7 @@ class INET_API BlockAcknowledgmentSendSessions
         BlockAcknowledgmentSendSessions();
         virtual ~BlockAcknowledgmentSendSessions();
 
+        virtual void blockAckReceived(Ieee80211BlockAck *blockAck);
         virtual bool addSession(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response);
         virtual void deleteSession(const MACAddress& responder, int tid);
         virtual Session *getSession(const MACAddress& responder, int tid);
