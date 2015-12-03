@@ -25,6 +25,7 @@ namespace ieee80211 {
 
 BlockAcknowledgmentSendSessions::BlockAcknowledgmentSendSessions()
 {
+
 }
 
 BlockAcknowledgmentSendSessions::~BlockAcknowledgmentSendSessions()
@@ -33,10 +34,25 @@ BlockAcknowledgmentSendSessions::~BlockAcknowledgmentSendSessions()
         delete it.second;
 }
 
-void BlockAcknowledgmentSendSessions::addSession(const MACAddress& responder, int tid, int startSequenceNumber, int windowSize)
+bool BlockAcknowledgmentSendSessions::addSession(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response)
 {
-    Session *session = new Session();
-    sendSessions[Key(responder, tid)] = session;
+    ASSERT(response->getTid() == request->getTid());
+    ASSERT(response->getBlockAckPolicy() == request->getBlockAckPolicy());
+
+    // The A-MSDU Supported field indicates whether an A-MSDU may be sent under the particular Block Ack
+    // agreement. The originator sets this field to 1 to indicate that it might transmit A-MSDUs with this TID. The
+    // recipient sets this field to 1 to indicate that it is capable of receiving an A-MSDU with this TID.
+    bool aMsduSupported = request->getAMsduSupported() && response->getAMsduSupported();
+    // NOTE—The recipient is free to respond with any setting of the A-MSDU supported field. If the value in the ADDBA
+    // Response frame is not acceptable to the originator, it can delete the Block Ack agreement and transmit data using normal
+    // acknowledgment.
+    if (aMsduSupported != request->getAMsduSupported())
+        return false; // TODO
+    Session *session = new Session(request, response);
+    MACAddress receiverAddr = request->getReceiverAddress();
+    int tid = request->getTid();
+    sendSessions[Key(receiverAddr, tid)] = session;
+    return true;
 }
 
 void BlockAcknowledgmentSendSessions::deleteSession(const MACAddress& responder, int tid)
@@ -53,9 +69,21 @@ BlockAcknowledgmentSendSessions::Session *BlockAcknowledgmentSendSessions::getSe
     return it == sendSessions.end() ? nullptr : it->second;
 }
 
-BlockAcknowledgmentSendSessions::Session::Session()
+BlockAcknowledgmentSendSessions::Session::Session(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response)
 {
-    //TODO
+    // When a Block Ack agreement is established between two HT STAs, the originator may change the size of its
+    // transmission window if the value in the Buffer Size field of the ADDBA Response frame is larger than the
+    // value in the ADDBA Request frame.
+    // If the value in the Buffer Size field of the ADDBA Response frame is smaller than the value in the ADDBA Request
+    // frame, the originator shall change the size of its transmission window (WinSizeO) so that it is not greater than
+    // the value in the Buffer Size field of the ADDBA Response frame and is not greater than the value 64.
+    if (response->getBufferSize() > request->getBufferSize())
+        txWindowSize = response->getBufferSize(); // TODO: may change..
+    else if (response->getBufferSize() < request->getBufferSize())
+        txWindowSize = response->getBufferSize();
+    txWindowSize = std::min(64, txWindowSize);
+    // Once the Block Ack exchange has been set up, data and ACK frames are transferred using the procedure
+    // described in 9.21.3.
 }
 
 BlockAcknowledgmentSendSessions::Session::~Session()
@@ -73,17 +101,15 @@ void BlockAcknowledgmentSendSessions::Session::addFrameToSend(Ieee80211DataOrMgm
 
 void BlockAcknowledgmentSendSessions::Session::framesAcknowledged(std::vector<int> ackedSequenceNumbers)
 {
-    //TODO
 }
 
 std::vector<Ieee80211DataOrMgmtFrame*> BlockAcknowledgmentSendSessions::Session::getFramesToRetransmit()
 {
-    //TODO
 }
 
 //----
 
-BlockAcknowledgmentReceiveSessions::BlockAcknowledgmentReceiveSessions()
+BlockAcknowledgmentReceiveSessions::BlockAcknowledgmentReceiveSessions(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response)
 {
 }
 
@@ -93,10 +119,9 @@ BlockAcknowledgmentReceiveSessions::~BlockAcknowledgmentReceiveSessions()
         delete it.second;
 }
 
-void BlockAcknowledgmentReceiveSessions::addSession(const MACAddress& originator, int tid, int startSequenceNumber, int windowSize)
+bool BlockAcknowledgmentReceiveSessions::addSession(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response)
 {
-    Session *session = new Session();
-    receiveSessions[Key(originator, tid)] = session;
+
 }
 
 void BlockAcknowledgmentReceiveSessions::deleteSession(const MACAddress& originator, int tid)
@@ -126,17 +151,15 @@ BlockAcknowledgmentReceiveSessions::Session::~Session()
 
 void BlockAcknowledgmentReceiveSessions::Session::addReceivedFrame(Ieee80211DataOrMgmtFrame *frame)
 {
-    //TODO
+
 }
 
 Ieee80211DataOrMgmtFrame *BlockAcknowledgmentReceiveSessions::Session::extractFrame()
 {
-    //TODO
 }
 
 std::vector<Ieee80211DataOrMgmtFrame*> BlockAcknowledgmentReceiveSessions::Session::extractAndFlushUntil(int startSequenceNumber)
 {
-    //TODO
 }
 
 } // namespace ieee80211

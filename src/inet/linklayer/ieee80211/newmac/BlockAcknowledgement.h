@@ -22,6 +22,7 @@
 
 #include "inet/common/INETDefs.h"
 #include "inet/linklayer/common/MACAddress.h"
+#include "inet/linklayer/ieee80211/mac/Ieee80211Frame_m.h"
 
 namespace inet {
 namespace ieee80211 {
@@ -37,12 +38,13 @@ class INET_API BlockAcknowledgmentSendSessions
     public:
         class INET_API Session {
             private:
+                bool aMsduSupported;
                 int beginSequenceNumber;
-                int windowSize;
+                int txWindowSize;
                 std::vector<Ieee80211DataOrMgmtFrame*> resendBuffer;
                 simtime_t lastUseTime;
             public:
-                Session();
+                Session(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response);
                 virtual ~Session();
                 virtual void addFrameToSend(Ieee80211DataOrMgmtFrame *frame);
                 virtual void framesAcknowledged(std::vector<int> ackedSequenceNumbers); // better, use a bitmap like the one in the BA frame
@@ -65,7 +67,7 @@ class INET_API BlockAcknowledgmentSendSessions
         BlockAcknowledgmentSendSessions();
         virtual ~BlockAcknowledgmentSendSessions();
 
-        virtual void addSession(const MACAddress& responder, int tid, int startSequenceNumber, int windowSize);
+        virtual bool addSession(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response);
         virtual void deleteSession(const MACAddress& responder, int tid);
         virtual Session *getSession(const MACAddress& responder, int tid);
 
@@ -80,7 +82,7 @@ class INET_API BlockAcknowledgmentReceiveSessions
         class Session {
             private:
                 int beginSequenceNumber;
-                int windowSize;
+                int windowSize; // buffer size?
                 std::vector<Ieee80211DataOrMgmtFrame*> reorderBuffer;
                 simtime_t lastUseTime;
 
@@ -105,10 +107,10 @@ class INET_API BlockAcknowledgmentReceiveSessions
         ReceiveSessions receiveSessions;
 
     public:
-        BlockAcknowledgmentReceiveSessions();
+        BlockAcknowledgmentReceiveSessions(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response);
         virtual ~BlockAcknowledgmentReceiveSessions();
 
-        virtual void addSession(const MACAddress& originator, int tid, int startSequenceNumber, int windowSize);
+        virtual bool addSession(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response);
         virtual void deleteSession(const MACAddress& originator, int tid);
         virtual Session *getSession(const MACAddress& originator, int tid);
 
