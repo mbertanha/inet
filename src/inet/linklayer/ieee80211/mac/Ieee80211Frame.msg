@@ -277,7 +277,7 @@ packet Ieee80211AddbaResponse extends Ieee80211ActionFrame
 //
 // 8.3.1.9 BlockAck frame format -- 410p.
 //
-packet Ieee80211BlockAck extends Ieee80211OneAddressFrame
+packet Ieee80211BlockAck extends Ieee80211TwoAddressFrame
 {
     // byteLength TODO
     // The RA field of the BlockAck frame is the address of the recipient STA that requested the Block Ack.
@@ -314,6 +314,10 @@ packet Ieee80211BasicBlockAck extends Ieee80211BlockAck
     // field and Block Ack Starting Sequence Control subfield values are treated as a 16-bit unsigned integer. For
     // unused fragment numbers of an MSDU, the corresponding bits in the bitmap are set to 0.
     BitVector blockAckBitmap[64]; // 64 * 16 bitmatrix
+
+    // The TID_INFO subfield of the BA Control field of the Basic BlockAck frame contains the TID for which
+    // this BlockAck frame is sent.
+    int tidInfo;
 }
 
 //
@@ -331,6 +335,10 @@ packet Ieee80211CompressedBlockAck extends Ieee80211BlockAck
     int fragmentNumber;
     int startingSequenceNumber;
     BitVector blockAckBitmap; // 64 bits
+
+    // The TID_INFO subfield of the BA Control field of the Compressed BlockAck frame contains the TID for
+    // which this BlockAck frame is sent.
+    int tidInfo;
 }
 
 //
