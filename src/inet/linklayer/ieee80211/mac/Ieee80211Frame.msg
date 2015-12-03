@@ -274,6 +274,78 @@ packet Ieee80211AddbaResponse extends Ieee80211ActionFrame
     simtime_t blockAckTimeoutValue;
 }
 
+
+//
+// 8.3.1.8 BlockAckReq frame format
+//
+packet Ieee80211BlockAckReq extends Ieee80211TwoAddressFrame
+{
+    // byteLength TODO
+    // The RA field of the BlockAck frame is the address of the recipient STA that requested the Block Ack.
+    // The TA field is the address of the STA transmitting the BlockAck frame.
+    type = ST_BLOCKACK_REQ;
+
+    bool multiTid;
+    bool compressedBitmap;
+    bool barAckPolicy; // 0-Normal Acknowledgment, 1-No Acknowledgment.
+}
+
+packet Ieee80211BasicBlockAckReq extends Ieee80211BlockAckReq
+{
+    // byteLength TODO
+
+    int tidInfo; //  The TID_INFO subfield of the BAR Control field of the Basic BlockAckReq frame contains the TID for which a Basic BlockAck frame is requested.
+
+    // The BAR Information field of the Basic BlockAckReq frame contains the Block Ack Starting Sequence
+    // Control subfield, as shown in Figure 8-21. The Starting Sequence Number subfield of the Block Ack
+    // Starting Sequence Control subfield contains the sequence number of the first MSDU for which this Basic
+    // BlockAckReq frame is sent. The Fragment Number subfield is set to 0.
+    int fragmentNumber = 0;
+    int startingSequenceNumber;
+
+    multiTid = 0;
+    compressedBitmap = 0;
+}
+
+
+packet Ieee80211CompressedBlockAckReq extends Ieee80211BlockAckReq
+{
+    // byteLength TODO
+    // The RA field of the BlockAck frame is the address of the recipient STA that requested the Block Ack.
+    // The TA field is the address of the STA transmitting the BlockAck frame.
+    type = ST_BLOCKACK_REQ;
+    // The BAR Information field of the Compressed BlockAckReq frame contains the Block Ack Starting
+    // Sequence Control subfield, as shown in Figure 8-21. The Starting Sequence Number subfield of the Block
+    // Ack Starting Sequence Control subfield contains the sequence number of the first MSDU or A-MSDU for
+    // which this BlockAckReq frame is sent. The Fragment Number subfield of the Block Ack Starting Sequence
+    // Control subfield is set to 0.
+
+    int fragmentNumber = 0;
+    int startingSequenceNumber;
+
+    multiTid = 0;
+    compressedBitmap = 1;
+}
+
+packet Ieee80211MultiTidBlockAckReq extends Ieee80211BlockAckReq
+{
+    // byteLength TODO
+    // The RA field of the BlockAck frame is the address of the recipient STA that requested the Block Ack.
+    // The TA field is the address of the STA transmitting the BlockAck frame.
+    type = ST_BLOCKACK_REQ;
+    // The BAR Information field of the Compressed BlockAckReq frame contains the Block Ack Starting
+    // Sequence Control subfield, as shown in Figure 8-21. The Starting Sequence Number subfield of the Block
+    // Ack Starting Sequence Control subfield contains the sequence number of the first MSDU or A-MSDU for
+    // which this BlockAckReq frame is sent. The Fragment Number subfield of the Block Ack Starting Sequence
+    // Control subfield is set to 0.
+
+    multiTid = 1;
+    compressedBitmap = 1;
+
+    // TODO: unimplemented
+}
+
+
 //
 // 8.3.1.9 BlockAck frame format -- 410p.
 //
