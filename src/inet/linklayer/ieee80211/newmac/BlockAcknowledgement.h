@@ -40,14 +40,18 @@ class INET_API BlockAcknowledgmentSendSessions
                 bool aMsduSupported;
                 int startingSequenceNumber;
                 int txWindowSize;
-                std::vector<Ieee80211DataOrMgmtFrame*> transmittedFrames;
+                std::vector<Ieee80211DataOrMgmtFrame*>  transmittedFrames;
+                std::vector<Ieee80211DataOrMgmtFrame*> framesToRetransmit;
 
             public:
                 Session(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response);
                 virtual ~Session();
+                virtual void collectFramesToRetransmit(Ieee80211BasicBlockAck *basicBlockAck);
+                virtual void collectFramesToRetransmit(Ieee80211CompressedBlockAck *basicBlockAck);
                 virtual void addFrameToTransmittedFrames(Ieee80211DataOrMgmtFrame *frame);
-                virtual std::vector<Ieee80211DataOrMgmtFrame*>& getTransmittedFrames();
-                virtual std::vector<Ieee80211DataOrMgmtFrame*> getFramesToRetransmit();
+                virtual std::vector<Ieee80211DataOrMgmtFrame*>& getTransmittedFrames() { return transmittedFrames; }
+                virtual std::vector<Ieee80211DataOrMgmtFrame*>& getFramesToRetransmit() { return framesToRetransmit; } // Note: insert them into the TX queue in reverse order.
+                virtual int getStartingSequenceNumber() { return startingSequenceNumber; }
         };
 
     protected:

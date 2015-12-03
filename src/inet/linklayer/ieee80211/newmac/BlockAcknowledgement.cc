@@ -106,24 +106,13 @@ void BlockAcknowledgmentSendSessions::blockAckReceived(Ieee80211BlockAck *blockA
     {
         Ieee80211BasicBlockAck *basicBlockAck = dynamic_cast<Ieee80211BasicBlockAck*>(blockAck);
         tid = basicBlockAck->getTidInfo();
-        Session *session = getSession(basicBlockAck->getTransmitterAddress(), tid);
-        std::vector<Ieee80211DataOrMgmtFrame*> transmittedFrames = session->getTransmittedFrames();
-        for (int i = 0; i < basicBlockAck->getBlockAckBitmapArraySize(); i++)
-        {
-            BitVector ackedFrames = basicBlockAck->getBlockAckBitmap(i);
-            for (int i = 0; i < transmittedFrames.size(); i++)
-            {
-
-            }
-        }
+        getSession(basicBlockAck->getTransmitterAddress(), tid)->collectFramesToRetransmit(basicBlockAck);
     }
     else if (blockAck->getMultiTid() == 0 && blockAck->getCompressedBitmap() == 1) // Note: fragments are not supported
     {
         Ieee80211CompressedBlockAck *compressedBlockAck = dynamic_cast<Ieee80211CompressedBlockAck*>(blockAck);
         tid = compressedBlockAck->getTidInfo();
-        Session *session = getSession(compressedBlockAck->getTransmitterAddress(), tid);
-        BitVector ackedFrames = compressedBlockAck->getBlockAckBitmap();
-        // TODO:
+        getSession(compressedBlockAck->getTransmitterAddress(), tid)->collectFramesToRetransmit(compressedBlockAck);
     }
     else if (blockAck->getMultiTid() == 1 && blockAck->getCompressedBitmap() == 1)
         throw cRuntimeError("MultiTid BlockAck is unsupported.");
@@ -131,9 +120,30 @@ void BlockAcknowledgmentSendSessions::blockAckReceived(Ieee80211BlockAck *blockA
         throw cRuntimeError("Unknown BlockAck variant");
 }
 
-std::vector<Ieee80211DataOrMgmtFrame*> BlockAcknowledgmentSendSessions::Session::getFramesToRetransmit()
+void BlockAcknowledgmentSendSessions::Session::collectFramesToRetransmit(Ieee80211BasicBlockAck *basicBlockAck)
 {
+    for (auto frame : transmittedFrames)
+    {
+        int sequenceNumber = frame->getSequenceNumber();
+        int fragmentNumber = frame->getFragmentNumber();
+
+        BitVector ackedFragments = basicBlockAck->getBlockAckBitmap(sequenceNumber - startingSequenceNumber);
+        if (ackedFragments.getBit(fragmentNumber) == 0)
+            framesToRetransmit.push_back(frame);
+    }
 }
+
+void BlockAcknowledgmentSendSessions::Session::collectFramesToRetransmit(Ieee80211CompressedBlockAck *basicBlockAck)
+{
+    BitVector ackedMsdus = basicBlockAck->getBlockAckBitmap();
+    for (auto frame : transmittedFrames)
+    {
+        int sequenceNumber = frame->getSequenceNumber();
+        if (ackedMsdus.getBit(sequenceNumber - startingSequenceNumber) == 0)
+            framesToRetransmit.push_back(frame);
+    }
+}
+
 
 //----
 
