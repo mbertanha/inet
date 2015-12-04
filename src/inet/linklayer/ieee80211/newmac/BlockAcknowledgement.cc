@@ -35,25 +35,14 @@ BlockAcknowledgmentSendSessions::~BlockAcknowledgmentSendSessions()
         delete it.second;
 }
 
-bool BlockAcknowledgmentSendSessions::addSession(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response)
+void BlockAcknowledgmentSendSessions::addSession(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response)
 {
     ASSERT(response->getTid() == request->getTid());
     ASSERT(response->getBlockAckPolicy() == request->getBlockAckPolicy());
-
-    // The A-MSDU Supported field indicates whether an A-MSDU may be sent under the particular Block Ack
-    // agreement. The originator sets this field to 1 to indicate that it might transmit A-MSDUs with this TID. The
-    // recipient sets this field to 1 to indicate that it is capable of receiving an A-MSDU with this TID.
-    bool aMsduSupported = request->getAMsduSupported() && response->getAMsduSupported();
-    // NOTE—The recipient is free to respond with any setting of the A-MSDU supported field. If the value in the ADDBA
-    // Response frame is not acceptable to the originator, it can delete the Block Ack agreement and transmit data using normal
-    // acknowledgment.
-    if (aMsduSupported != request->getAMsduSupported())
-        return false; // TODO
     Session *session = new Session(request, response);
     MACAddress receiverAddr = request->getReceiverAddress();
     int tid = request->getTid();
     sendSessions[Key(receiverAddr, tid)] = session;
-    return true;
 }
 
 void BlockAcknowledgmentSendSessions::deleteSession(const MACAddress& responder, int tid)
@@ -94,7 +83,7 @@ BlockAcknowledgmentSendSessions::Session::~Session()
         delete frame;
 }
 
-void BlockAcknowledgmentSendSessions::Session::addFrameToTransmittedFrames(Ieee80211DataOrMgmtFrame *frame)
+void BlockAcknowledgmentSendSessions::Session::addToTransmittedFrames(Ieee80211DataOrMgmtFrame *frame)
 {
     transmittedFrames.push_back(frame);
 }
@@ -104,13 +93,13 @@ void BlockAcknowledgmentSendSessions::blockAckReceived(Ieee80211BlockAck *blockA
     int tid;
     if (blockAck->getMultiTid() == 0 && blockAck->getCompressedBitmap() == 0) // Note: fragments are supported
     {
-        Ieee80211BasicBlockAck *basicBlockAck = dynamic_cast<Ieee80211BasicBlockAck*>(blockAck);
+        Ieee80211BasicBlockAck *basicBlockAck = check_and_cast<Ieee80211BasicBlockAck*>(blockAck);
         tid = basicBlockAck->getTidInfo();
         getSession(basicBlockAck->getTransmitterAddress(), tid)->collectFramesToRetransmit(basicBlockAck);
     }
     else if (blockAck->getMultiTid() == 0 && blockAck->getCompressedBitmap() == 1) // Note: fragments are not supported
     {
-        Ieee80211CompressedBlockAck *compressedBlockAck = dynamic_cast<Ieee80211CompressedBlockAck*>(blockAck);
+        Ieee80211CompressedBlockAck *compressedBlockAck = check_and_cast<Ieee80211CompressedBlockAck*>(blockAck);
         tid = compressedBlockAck->getTidInfo();
         getSession(compressedBlockAck->getTransmitterAddress(), tid)->collectFramesToRetransmit(compressedBlockAck);
     }
@@ -143,6 +132,52 @@ void BlockAcknowledgmentSendSessions::Session::collectFramesToRetransmit(Ieee802
             framesToRetransmit.push_back(frame);
     }
 }
+
+void BlockAcknowledgmentSendSessions::delbaReceived(Ieee80211Delba* delba)
+{
+}
+
+bool BlockAcknowledgmentSendSessions::addbaResponseReceived(Ieee80211AddbaRequest* request, Ieee80211AddbaResponse* response)
+{
+    // The A-MSDU Supported field indicates whether an A-MSDU may be sent under the particular Block Ack
+    // agreement. The originator sets this field to 1 to indicate that it might transmit A-MSDUs with this TID. The
+    // recipient sets this field to 1 to indicate that it is capable of receiving an A-MSDU with this TID.
+    bool aMsduSupported = request->getAMsduSupported() && response->getAMsduSupported();
+    // NOTE—The recipient is free to respond with any setting of the A-MSDU supported field. If the value in the ADDBA
+    // Response frame is not acceptable to the originator, it can delete the Block Ack agreement and transmit data using normal
+    // acknowledgment.
+    if (aMsduSupported != request->getAMsduSupported())
+        return false;
+    addSession(request, response);
+    return true;
+}
+std::vector<Ieee80211DataOrMgmtFrame*>& BlockAcknowledgmentSendSessions::getFramesToRetransmit(Ieee80211BlockAck* blockAck)
+{
+    MACAddress responder = blockAck->getTransmitterAddress();
+    int tid;
+    if (blockAck->getMultiTid() == 0 && blockAck->getCompressedBitmap() == 0) // Note: fragments are supported
+    {
+        Ieee80211BasicBlockAck *basicBlockAck = check_and_cast<Ieee80211BasicBlockAck*>(blockAck);
+        tid = basicBlockAck->getTidInfo();
+    }
+    else if (blockAck->getMultiTid() == 0 && blockAck->getCompressedBitmap() == 1) // Note: fragments are not supported
+    {
+        Ieee80211CompressedBlockAck *compressedBlockAck = check_and_cast<Ieee80211CompressedBlockAck*>(blockAck);
+        tid = compressedBlockAck->getTidInfo();
+    }
+    else if (blockAck->getMultiTid() == 1 && blockAck->getCompressedBitmap() == 1)
+    {
+        throw cRuntimeError("MultiTid BlockAck is unsupported.");
+        // TODO:
+        // int tids[] = multiTidBlockAck->getTidInfo();
+        // for (tid : tids)
+        //  ... getSession(responder, tid)->getFramesToRetransmit()
+    }
+    else
+        throw cRuntimeError("Unknown BlockAck variant");
+    return getSession(responder, tid)->getFramesToRetransmit();
+}
+
 
 
 //----

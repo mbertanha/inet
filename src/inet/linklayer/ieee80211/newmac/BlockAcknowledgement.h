@@ -48,10 +48,8 @@ class INET_API BlockAcknowledgmentSendSessions
                 virtual ~Session();
                 virtual void collectFramesToRetransmit(Ieee80211BasicBlockAck *basicBlockAck);
                 virtual void collectFramesToRetransmit(Ieee80211CompressedBlockAck *basicBlockAck);
-                virtual void addFrameToTransmittedFrames(Ieee80211DataOrMgmtFrame *frame);
-                virtual std::vector<Ieee80211DataOrMgmtFrame*>& getTransmittedFrames() { return transmittedFrames; }
-                virtual std::vector<Ieee80211DataOrMgmtFrame*>& getFramesToRetransmit() { return framesToRetransmit; } // Note: insert them into the TX queue in reverse order.
-                virtual int getStartingSequenceNumber() { return startingSequenceNumber; }
+                virtual void addToTransmittedFrames(Ieee80211DataOrMgmtFrame *frame);
+                virtual std::vector<Ieee80211DataOrMgmtFrame*>& getFramesToRetransmit() { return framesToRetransmit; }
         };
 
     protected:
@@ -66,15 +64,19 @@ class INET_API BlockAcknowledgmentSendSessions
         typedef std::map<Key,Session*> SendSessions;
         SendSessions sendSessions;
 
+    protected:
+        virtual void addSession(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response);
+        virtual void deleteSession(const MACAddress& responder, int tid);
+        virtual Session *getSession(const MACAddress& responder, int tid);
+
     public:
         BlockAcknowledgmentSendSessions();
         virtual ~BlockAcknowledgmentSendSessions();
 
         virtual void blockAckReceived(Ieee80211BlockAck *blockAck);
-        virtual bool addSession(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response);
-        virtual void deleteSession(const MACAddress& responder, int tid);
-        virtual Session *getSession(const MACAddress& responder, int tid);
-
+        virtual void delbaReceived(Ieee80211Delba *delba);
+        virtual bool addbaResponseReceived(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response);
+        virtual std::vector<Ieee80211DataOrMgmtFrame*>& getFramesToRetransmit(Ieee80211BlockAck *blockAck); // Note: insert them into the TX queue in reverse order.
 };
 
 /**
