@@ -274,6 +274,30 @@ packet Ieee80211AddbaResponse extends Ieee80211ActionFrame
     simtime_t blockAckTimeoutValue;
 }
 
+//
+// 8.5.5.4 DELBA frame format
+//
+packet Ieee80211Delba extends Ieee80211ActionFrame
+{
+    // byteLength TODO
+    category = 3;
+    int blockAckAction = 2; // representing DELBA
+
+    // DELBA Parameter Set
+    // It is set to 1 to indicate the originator and is set to 0 to indicate the recipient.
+    // The Initiator subfield indicates if the originator or the recipient of the data is sending this frame.
+    bool initiator;
+
+    // The TID subfield indicates the TSID or the UP for which the Block Ack has been originally set up.
+    int tid;
+
+    // This Reason Code field is used to indicate the reason that an unsolicited notification management frame of
+    // type Disassociation, Deauthentication, DELTS, DELBA, DLS Teardown, or Mesh Peering Close was
+    // generated.
+    int reasonCode;
+}
+
+
 
 //
 // 8.3.1.8 BlockAckReq frame format
