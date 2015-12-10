@@ -92,6 +92,9 @@ class INET_API EdcaUpperMac : public cSimpleModule, public IUpperMac, public ICo
         virtual AccessCategory mapTidToAc(int tid);
         virtual void enqueue(Ieee80211DataOrMgmtFrame *frame, AccessCategory ac);
         Ieee80211DataOrMgmtFrame* dequeue(AccessCategory ac);
+        Ieee80211DataOrMgmtFrame *aggregateIfPossible(AccessCategory ac);
+        bool fragmentIfPossible(Ieee80211DataOrMgmtFrame *nextFrame, bool aMsduPresent, AccessCategory ac);
+        void assignSequenceNumber(Ieee80211DataOrMgmtFrame *frame);
         virtual void startSendDataFrameExchange(Ieee80211DataOrMgmtFrame *frame, int txIndex, AccessCategory ac);
         virtual void frameExchangeFinished(IFrameExchange *what, bool successful) override;
 

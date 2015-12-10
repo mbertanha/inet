@@ -167,20 +167,15 @@ void EdcaUpperMac::enqueue(Ieee80211DataOrMgmtFrame *frame, AccessCategory ac)
     acData[ac].transmissionQueue.insert(frame);
 }
 
-Ieee80211DataOrMgmtFrame* EdcaUpperMac::dequeue(AccessCategory ac)
+Ieee80211DataOrMgmtFrame* EdcaUpperMac::aggregateIfPossible(AccessCategory ac)
 {
-    Enter_Method("dequeue()");
-    Ieee80211DataOrMgmtFrame *nextFrame;
-    if (msduAggregator)
-        nextFrame = check_and_cast<Ieee80211DataOrMgmtFrame *>(msduAggregator->createAggregateFrame(&acData[ac].transmissionQueue));
-    else
-        nextFrame = check_and_cast<Ieee80211DataOrMgmtFrame *>(acData[ac].transmissionQueue.pop());
-    EV_INFO << nextFrame << " is selected from the transmission queue." << std::endl;
-    duplicateDetection->assignSequenceNumber(nextFrame);
-    Ieee80211DataFrame *nextDataFrame = dynamic_cast<Ieee80211DataFrame *>(nextFrame);
-    bool aMsduPresent = nextDataFrame && nextDataFrame->getAMsduPresent();
-    if (aMsduPresent)
-        EV_INFO << "It is an " <<  nextFrame->getByteLength() << " octets long A-MSDU aggregated frame." << std::endl;
+    return msduAggregator ?
+        check_and_cast<Ieee80211DataOrMgmtFrame *>(msduAggregator->createAggregateFrame(&acData[ac].transmissionQueue)) :
+        check_and_cast<Ieee80211DataOrMgmtFrame *>(acData[ac].transmissionQueue.pop());
+}
+
+bool EdcaUpperMac::fragmentIfPossible(Ieee80211DataOrMgmtFrame* nextFrame, bool aMsduPresent, AccessCategory ac)
+{
     if (nextFrame->getByteLength() > fragmentationThreshold && !aMsduPresent)
     {
         EV_INFO << "The frame length is " << nextFrame->getByteLength() << " octets. Fragmentation threshold is reached. Fragmenting..." << std::endl;
@@ -197,9 +192,28 @@ Ieee80211DataOrMgmtFrame* EdcaUpperMac::dequeue(AccessCategory ac)
             for (Ieee80211DataOrMgmtFrame *fragment : fragments)
                 acData[ac].transmissionQueue.insertBefore(where, fragment);
         }
-        return (Ieee80211DataOrMgmtFrame*) acData[ac].transmissionQueue.pop();
+        return true;
     }
-    return nextFrame;
+    return false;
+}
+
+
+void EdcaUpperMac::assignSequenceNumber(Ieee80211DataOrMgmtFrame* frame)
+{
+    duplicateDetection->assignSequenceNumber(frame);
+}
+
+Ieee80211DataOrMgmtFrame* EdcaUpperMac::dequeue(AccessCategory ac)
+{
+    Enter_Method("dequeue()");
+    Ieee80211DataOrMgmtFrame *nextFrame = aggregateIfPossible(ac);
+    EV_INFO << nextFrame << " is selected from the transmission queue." << std::endl;
+    assignSequenceNumber(nextFrame);
+    Ieee80211DataFrame *nextDataFrame = dynamic_cast<Ieee80211DataFrame *>(nextFrame);
+    bool aMsduPresent = nextDataFrame && nextDataFrame->getAMsduPresent();
+    if (aMsduPresent)
+        EV_INFO << "It is an " <<  nextFrame->getByteLength() << " octets long A-MSDU aggregated frame." << std::endl;
+    return fragmentIfPossible(nextFrame, aMsduPresent, ac) ? (Ieee80211DataOrMgmtFrame*) acData[ac].transmissionQueue.pop() : nextFrame;
 }
 
 
