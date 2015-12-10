@@ -248,7 +248,13 @@ void DcfUpperMac::corruptedFrameReceived()
 void DcfUpperMac::channelAccessGranted(int txIndex)
 {
     Enter_Method("channelAccessGranted()");
-    startSendDataFrameExchange(dequeue(), 0, AC_LEGACY);
+    if (frameExchange)
+    {
+        IContentionCallback *contentionCallback = (IContentionCallback *)frameExchange;
+        contentionCallback->channelAccessGranted(0);
+    }
+    else
+        startSendDataFrameExchange(dequeue(), 0, AC_LEGACY);
 }
 
 void DcfUpperMac::internalCollision(int txIndex)
@@ -290,7 +296,6 @@ void DcfUpperMac::startSendDataFrameExchange(Ieee80211DataOrMgmtFrame *frame, in
         frameExchange = new SendDataWithRtsCtsFrameExchange(&context, this, frame, txIndex, ac);
     else
         frameExchange = new SendDataWithAckFrameExchange(&context, this, frame, txIndex, ac);
-    contention[0]->setContentionCallback((IContentionCallback*)frameExchange);
     frameExchange->start();
 }
 

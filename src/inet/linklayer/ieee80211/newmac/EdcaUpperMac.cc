@@ -318,10 +318,16 @@ void EdcaUpperMac::channelAccessGranted(int txIndex)
 
 void EdcaUpperMac::internalCollision(int txIndex)
 {
+    Enter_Method("internalCollision()");
     // FIXME: double the contention window!
     // FIXME: increment the retry counts!
-    Enter_Method("internalCollision()");
-    startContention((AccessCategory)txIndex); // TODO: Review it! I don't know what is the correct procedure in this case.
+    if (acData[txIndex].frameExchange)
+    {
+        IContentionCallback *contentionCallback = (IContentionCallback *)acData[txIndex].frameExchange;
+        contentionCallback->internalCollision(txIndex);
+    }
+    else
+        startContention((AccessCategory)txIndex); // TODO: Review it! I don't know what is the correct procedure in this case.
 }
 
 void EdcaUpperMac::startContention(AccessCategory ac)
@@ -364,7 +370,6 @@ void EdcaUpperMac::startSendDataFrameExchange(Ieee80211DataOrMgmtFrame *frame, i
         frameExchange = new SendDataWithAckFrameExchange(&context, this, frame, txIndex, ac);
 
     frameExchange->start();
-    contention[ac]->setContentionCallback((IContentionCallback*)frameExchange);
     acData[ac].frameExchange = frameExchange;
 }
 

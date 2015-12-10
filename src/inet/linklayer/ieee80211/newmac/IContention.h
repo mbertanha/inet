@@ -44,7 +44,6 @@ class INET_API IContention
     public:
         virtual ~IContention() {}
         virtual void startContention(simtime_t ifs, simtime_t eifs, int cwMin, int cwMax, simtime_t slotTime, int retryCount, IContentionCallback *callback) = 0;
-        virtual void setContentionCallback(IContentionCallback *callback) = 0;
 
         // notifications
         virtual void mediumStateChanged(bool mediumFree) = 0;
