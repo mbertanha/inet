@@ -133,8 +133,12 @@ void BlockAcknowledgmentSendSessions::Session::collectFramesToRetransmit(Ieee802
     }
 }
 
+//
+// 10.5.3.3 Procedure at the recipient of the DELBA frame
+//
 void BlockAcknowledgmentSendSessions::delbaReceived(Ieee80211Delba* delba)
 {
+
 }
 
 bool BlockAcknowledgmentSendSessions::addbaResponseReceived(Ieee80211AddbaRequest* request, Ieee80211AddbaResponse* response)

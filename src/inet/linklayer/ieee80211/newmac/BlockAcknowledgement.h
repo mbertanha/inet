@@ -42,6 +42,7 @@ class INET_API BlockAcknowledgmentSendSessions
                 int txWindowSize;
                 std::vector<Ieee80211DataOrMgmtFrame*>  transmittedFrames;
                 std::vector<Ieee80211DataOrMgmtFrame*> framesToRetransmit;
+                // cMessage *inactivityTimer = nullptr; TODO: 10.5.3.3 Procedure at the recipient of the DELBA frame
 
             public:
                 Session(Ieee80211AddbaRequest *request, Ieee80211AddbaResponse *response);
