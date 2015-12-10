@@ -85,6 +85,9 @@ class INET_API DcfUpperMac : public cSimpleModule, public IUpperMac, public ICon
 
         virtual void enqueue(Ieee80211DataOrMgmtFrame *frame);
         virtual Ieee80211DataOrMgmtFrame *dequeue();
+        Ieee80211DataOrMgmtFrame *aggregateIfPossible();
+        bool fragmentIfPossible(Ieee80211DataOrMgmtFrame *nextFrame, bool aMsduPresent);
+        void assignSequenceNumber(Ieee80211DataOrMgmtFrame *frame);
         virtual void startSendDataFrameExchange(Ieee80211DataOrMgmtFrame *frame, int txIndex, AccessCategory ac);
         virtual void frameExchangeFinished(IFrameExchange *what, bool successful) override;
         virtual void startContention();
