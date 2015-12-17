@@ -24,6 +24,7 @@ src/Makefile.vc
 *.vec
 *.vci
 .buildlog*
+
 # ignore binary files
 out/
 *.so
@@ -44,6 +45,7 @@ out/
 netanim-trace.txt
 *.out
 gcc-debug
+.oppfeaturestate
 
 # ignore backup and temp files
 *.UPDATED

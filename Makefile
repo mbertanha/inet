@@ -33,6 +33,7 @@ checkmakefiles:
 	echo; \
 	exit 1; \
 	fi
+	@if [ ! -f .oppfeaturestate ]; then ./inet_featuretool reset; fi
 
 doxy:
 	doxygen doxy.cfg
