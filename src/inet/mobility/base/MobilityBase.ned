@@ -29,6 +29,10 @@ simple MobilityBase like IMobility
     parameters:
         @signal[mobilityStateChanged](type=MobilityBase);
         @display("i=block/cogwheel");
+        string coordinateSystemModule = default(""); // module path of the geographic coordinate system module
+        bool visualizeMobility = default(true); // false means this mobility module does no visualization
+        string visualRepresentation = default("^"); // determines the module that is moved by this mobility
+        string networkNodeVisualizerModule = default("visualizer.osgVisualizer.networkNodeVisualizer");
         double constraintAreaMinX @unit(m) = default(-1m/0); // min x position of the constraint area, unconstrained by default (negative infinity)
         double constraintAreaMinY @unit(m) = default(-1m/0); // min y position of the constraint area, unconstrained by default (negative infinity)
         double constraintAreaMinZ @unit(m) = default(-1m/0); // min z position of the constraint area, unconstrained by default (negative infinity)
