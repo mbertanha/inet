@@ -56,7 +56,7 @@ class INET_API RadioMedium : public cSimpleModule, public cListener, public IRad
         virtual void receptionStarted(const IReception *reception) = 0;
         virtual void receptionEnded(const IReception *reception) = 0;
 
-        virtual void packetReceived(const IReceptionDecision *decision) = 0;
+        virtual void packetReceived(const IReceptionResult *result) = 0;
     };
 
   protected:
@@ -346,7 +346,7 @@ class INET_API RadioMedium : public cSimpleModule, public cListener, public IRad
     virtual void fireReceptionStarted(const IReception *reception) const;
     virtual void fireReceptionEnded(const IReception *reception) const;
 
-    virtual void firePacketReceived(const IReceptionDecision *decision) const;
+    virtual void firePacketReceived(const IReceptionResult *result) const;
     //@}
 
   public:
