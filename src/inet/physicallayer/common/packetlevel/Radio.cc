@@ -429,7 +429,7 @@ void Radio::startReception(cMessage *timer, IRadioSignal::SignalPart part)
     scheduleAt(arrival->getEndTime(part), timer);
     updateTransceiverState();
     updateTransceiverPart();
-    check_and_cast<RadioMedium *>(medium)->fireReceptionStarted(medium->getReception(this, transmission));
+    check_and_cast<RadioMedium *>(medium)->fireReceptionStarted(reception);
 }
 
 void Radio::continueReception(cMessage *timer)
@@ -479,7 +479,7 @@ void Radio::endReception(cMessage *timer)
         EV_INFO << "Reception ended: ignoring " << (IRadioFrame *)radioFrame << " " << IRadioSignal::getSignalPartName(part) << " as " << reception << endl;
     updateTransceiverState();
     updateTransceiverPart();
-    check_and_cast<RadioMedium *>(medium)->fireReceptionEnded(medium->getReception(this, transmission));
+    check_and_cast<RadioMedium *>(medium)->fireReceptionEnded(reception);
     delete timer;
 }
 

@@ -45,8 +45,6 @@ class INET_API RadioMedium : public cSimpleModule, public cListener, public IRad
   public:
     class INET_API IMediumListener {
       public:
-        virtual void mediumChanged() = 0;
-
         virtual void radioAdded(const IRadio *radio) = 0;
         virtual void radioRemoved(const IRadio *radio) = 0;
 
@@ -337,8 +335,6 @@ class INET_API RadioMedium : public cSimpleModule, public cListener, public IRad
 
     /** @name Notification */
     //@{
-    virtual void fireMediumChanged() const;
-
     virtual void fireRadioAdded(const IRadio *radio) const;
     virtual void fireRadioRemoved(const IRadio *radio) const;
 

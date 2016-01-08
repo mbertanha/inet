@@ -168,10 +168,8 @@ std::ostream& RadioMedium::printToStream(std::ostream &stream, int level) const
 
 void RadioMedium::handleMessage(cMessage *message)
 {
-    if (message == removeNonInterferingTransmissionsTimer) {
+    if (message == removeNonInterferingTransmissionsTimer)
         removeNonInterferingTransmissions();
-        fireMediumChanged();
-    }
     else
         throw cRuntimeError("Unknown message");
 }
@@ -633,8 +631,6 @@ bool RadioMedium::isReceptionPossible(const IRadio *receiver, const ITransmissio
     const IInterference *interference = computeInterference(receiver, listening, transmission, const_cast<const std::vector<const ITransmission *> *>(&transmissions));
     bool isReceptionPossible = receiver->getReceiver()->computeIsReceptionAttempted(listening, reception, part, interference);
     delete interference;
-    if (mediumVisualizer != nullptr)
-        mediumVisualizer->mediumChanged();
     return isReceptionPossible;
 }
 
@@ -646,7 +642,6 @@ bool RadioMedium::isReceptionAttempted(const IRadio *receiver, const ITransmissi
     const IInterference *interference = computeInterference(receiver, listening, transmission, const_cast<const std::vector<const ITransmission *> *>(&transmissions));
     bool isReceptionAttempted = receiver->getReceiver()->computeIsReceptionAttempted(listening, reception, part, interference);
     delete interference;
-    fireMediumChanged();
     return isReceptionAttempted;
 }
 
@@ -659,8 +654,6 @@ bool RadioMedium::isReceptionSuccessful(const IRadio *receiver, const ITransmiss
     const ISNIR *snir = getSNIR(receiver, transmission);
     bool isReceptionSuccessful = receiver->getReceiver()->computeIsReceptionSuccessful(listening, reception, part, interference, snir);
     delete interference;
-    if (mediumVisualizer != nullptr)
-        mediumVisualizer->mediumChanged();
     return isReceptionSuccessful;
 }
 
@@ -707,12 +700,6 @@ void RadioMedium::receiveSignal(cComponent *source, simsignal_t signal, long val
             }
         }
     }
-}
-
-void RadioMedium::fireMediumChanged() const
-{
-    for (auto listener : listeners)
-        listener->mediumChanged();
 }
 
 void RadioMedium::fireRadioAdded(const IRadio *radio) const
