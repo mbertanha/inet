@@ -86,6 +86,7 @@ class INET_API BasicContention : public cSimpleModule, public IContention, prote
 
         //TODO also add a switchToReception() method? because switching takes time, so we dont automatically switch to tx after completing a transmission! (as we may want to transmit immediate frames afterwards)
         virtual void startContention(simtime_t ifs, simtime_t eifs, int cwMin, int cwMax, simtime_t slotTime, int retryCount, IContentionCallback *callback) override;
+        virtual void startContention(simtime_t ifs, simtime_t eifs, simtime_t slotTime, int cw, IContentionCallback *callback) override;
         virtual void channelReleased() override;
 
         virtual void mediumStateChanged(bool mediumFree) override;

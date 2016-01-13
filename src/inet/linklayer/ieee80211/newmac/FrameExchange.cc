@@ -35,7 +35,7 @@ FrameExchange::FrameExchange(FrameExchangeContext *context, IFinishedCallback *c
     contention(context->contention),
     rx(context->rx),
     statistics(context->statistics),
-    finishedCallback(callback)
+    upperMac(callback)
 {
 }
 
@@ -43,19 +43,9 @@ FrameExchange::~FrameExchange()
 {
 }
 
-void FrameExchange::startContention(int txIndex, simtime_t ifs, simtime_t eifs, int cwMin, int cwMax, simtime_t slotTime, int retryCount)
-{
-    contention[txIndex]->startContention(ifs, eifs, cwMin, cwMax, slotTime, retryCount, this);
-}
-
 void FrameExchange::transmitFrame(Ieee80211Frame *frame, simtime_t ifs)
 {
     tx->transmitFrame(frame, ifs, this);
-}
-
-void FrameExchange::releaseChannel(int txIndex)
-{
-    contention[txIndex]->channelReleased();
 }
 
 IFrameExchange::FrameProcessingResult FrameExchange::lowerFrameReceived(Ieee80211Frame *frame)
@@ -68,56 +58,17 @@ void FrameExchange::corruptedOrNotForUsFrameReceived()
     // we don't care
 }
 
-void FrameExchange::channelAccessGranted(int txIndex)
-{
-}
-
 void FrameExchange::reportSuccess()
 {
     EV_DETAIL << "Frame exchange successful\n";
-    finishedCallback->frameExchangeFinished(this, true);    // may delete *this* FrameExchange object!
+    upperMac->frameExchangeFinished(this, true);    // may delete *this* FrameExchange object!
 }
 
 void FrameExchange::reportFailure()
 {
     EV_DETAIL << "Frame exchange failed\n";
-    finishedCallback->frameExchangeFinished(this, false);    // may delete *this* FrameExchange object!
+    upperMac->frameExchangeFinished(this, false);    // may delete *this* FrameExchange object!
 }
-
-//--------
-
-void FsmBasedFrameExchange::start()
-{
-    EV_DETAIL << "Starting frame exchange " << getClassName() << std::endl;
-    handleWithFSM(EVENT_START);
-}
-
-IFrameExchange::FrameProcessingResult FsmBasedFrameExchange::lowerFrameReceived(Ieee80211Frame *frame)
-{
-    return handleWithFSM(EVENT_FRAMEARRIVED, frame);
-}
-
-void FsmBasedFrameExchange::corruptedOrNotForUsFrameReceived()
-{
-    handleWithFSM(EVENT_CORRUPTEDFRAMEARRIVED);
-}
-
-void FsmBasedFrameExchange::transmissionComplete()
-{
-    handleWithFSM(EVENT_TXFINISHED);
-}
-
-void FsmBasedFrameExchange::internalCollision(int txIndex)
-{
-    handleWithFSM(EVENT_INTERNALCOLLISION);
-}
-
-void FsmBasedFrameExchange::handleSelfMessage(cMessage *msg)
-{
-    handleWithFSM(EVENT_TIMER, msg);
-}
-
-//--------
 
 StepBasedFrameExchange::StepBasedFrameExchange(FrameExchangeContext *context, IFinishedCallback *callback, int txIndex, AccessCategory accessCategory) :
     FrameExchange(context, callback), defaultTxIndex(txIndex), defaultAccessCategory(accessCategory)
@@ -158,7 +109,6 @@ const char *StepBasedFrameExchange::operationName(Operation operation)
 #define CASE(x) case x: return #x
     switch (operation) {
         CASE(NONE);
-        CASE(START_CONTENTION);
         CASE(TRANSMIT_FRAME);
         CASE(EXPECT_FULL_REPLY);
         CASE(EXPECT_REPLY_RXSTART);
@@ -174,7 +124,6 @@ const char *StepBasedFrameExchange::operationFunctionName(Operation operation)
 {
     switch (operation) {
         case NONE: return "no-op";
-        case START_CONTENTION: return "startContention()";
         case TRANSMIT_FRAME: return "transmitFrame()";
         case EXPECT_FULL_REPLY: return "expectFullReplyWithin()";
         case EXPECT_REPLY_RXSTART: return "expectReplyStartTxWithin()";
@@ -185,7 +134,7 @@ const char *StepBasedFrameExchange::operationFunctionName(Operation operation)
     }
 }
 
-void StepBasedFrameExchange::start()
+void StepBasedFrameExchange::startFrameExchange()
 {
     EV_DETAIL << "Starting frame exchange " << getClassName() << std::endl;
     ASSERT(step == 0);
@@ -215,14 +164,6 @@ void StepBasedFrameExchange::proceed()
             cleanupAndReportResult(); // should be the last call in the lifetime of the object
         }
     }
-}
-
-void StepBasedFrameExchange::channelAccessGranted(int txIndex)
-{
-    ASSERT(status == INPROGRESS);
-    ASSERT(operation == START_CONTENTION);
-    EV_DETAIL << "Channel access granted\n";
-    proceed();
 }
 
 void StepBasedFrameExchange::transmissionComplete()
@@ -309,24 +250,6 @@ void StepBasedFrameExchange::handleSelfMessage(cMessage *msg)
     }
 }
 
-void StepBasedFrameExchange::internalCollision(int txIndex)
-{
-    EV_DETAIL << "Internal collision in step " << step << "\n";
-    ASSERT(status == INPROGRESS);
-    ASSERT(operation == START_CONTENTION);
-
-    operation = NONE;
-    processInternalCollision(step);
-    if (status == INPROGRESS) {
-        logStatus("processInternalCollision()");
-        checkOperation(operation, "processInternalCollision()");
-        proceed();
-    }
-    else {
-        cleanupAndReportResult(); // should be the last call in the lifetime of the object
-    }
-}
-
 void StepBasedFrameExchange::checkOperation(Operation operation, const char *where)
 {
     switch (operation) {
@@ -343,11 +266,23 @@ void StepBasedFrameExchange::handleTimeout()
     if (status == INPROGRESS) {
         logStatus("processTimeout()");
         checkOperation(operation, "processTimeout()");
-        proceed();
     }
     else {
         cleanupAndReportResult(); // should be the last call in the lifetime of the object
     }
+}
+
+void StepBasedFrameExchange::continueFrameExchange()
+{
+    proceed();
+}
+
+
+void StepBasedFrameExchange::abortFrameExchange()
+{
+    //statistics->frameTransmissionUnsuccessfulGivingUp(dataFrame, longRetryCount); // TOOD: fix longRetryCount, dataFrame
+    fail(); // TODO: giveUp
+    cleanupAndReportResult();
 }
 
 void StepBasedFrameExchange::cleanupAndReportResult()
@@ -360,45 +295,6 @@ void StepBasedFrameExchange::cleanupAndReportResult()
     }
     // NOTE: no members or methods may be accessed after this point, because the
     // success/failure callback might has probably deleted the frame exchange object!
-}
-
-void StepBasedFrameExchange::startContentionIfNeeded(int retryCount)
-{
-    if (!contention[defaultTxIndex]->isOwning())
-        startContention(retryCount);
-    else
-    {
-        setOperation(START_CONTENTION);
-        proceed();
-    }
-}
-
-void StepBasedFrameExchange::startContention(int retryCount)
-{
-    startContention(retryCount, defaultTxIndex, defaultAccessCategory);
-}
-
-void StepBasedFrameExchange::startContention(int retryCount, int txIndex, AccessCategory ac)
-{
-    setOperation(START_CONTENTION);
-    contention[txIndex]->startContention(params->getAifsTime(ac), params->getEifsTime(ac), params->getCwMin(ac), params->getCwMax(ac), params->getSlotTime(), retryCount, this);
-}
-
-void StepBasedFrameExchange::startContentionForMulticast()
-{
-    startContentionForMulticast(defaultTxIndex, defaultAccessCategory);
-}
-
-void StepBasedFrameExchange::startContentionForMulticast(int txIndex, AccessCategory ac)
-{
-    setOperation(START_CONTENTION);
-    contention[txIndex]->startContention(params->getAifsTime(ac), params->getEifsTime(ac), params->getCwMulticast(ac), params->getCwMulticast(ac), params->getSlotTime(), 0, this);
-}
-
-void StepBasedFrameExchange::startContention(int txIndex, simtime_t ifs, simtime_t eifs, int cwMin, int cwMax, simtime_t slotTime, int retryCount)
-{
-    setOperation(START_CONTENTION);
-    contention[txIndex]->startContention(ifs, eifs, cwMin, cwMax, slotTime, retryCount, this);
 }
 
 void StepBasedFrameExchange::transmitFrame(Ieee80211Frame *frame)
@@ -447,11 +343,6 @@ void StepBasedFrameExchange::succeed()
     setOperation(SUCCEED);
     status = SUCCEEDED;
     // note: we cannot call reportSuccess() right here as it might delete the frame exchange object
-}
-
-void StepBasedFrameExchange::releaseChannel()
-{
-    releaseChannel(defaultTxIndex);
 }
 
 void StepBasedFrameExchange::setOperation(Operation newOperation)

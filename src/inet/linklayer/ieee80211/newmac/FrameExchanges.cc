@@ -33,112 +33,6 @@ using namespace inet::utils;
 namespace inet {
 namespace ieee80211 {
 
-#if 0
-//TODO with the introduction of earlyAckTimeout, this class has become obsolete
-SendDataWithAckFsmBasedFrameExchange::SendDataWithAckFsmBasedFrameExchange(FrameExchangeContext *context, IFinishedCallback *callback, Ieee80211DataOrMgmtFrame *frame, int txIndex, AccessCategory accessCategory) :
-    FsmBasedFrameExchange(context, callback), frame(frame), txIndex(txIndex), accessCategory(accessCategory)
-{
-    frame->setDuration(params->getSifsTime() + utils->getAckDuration());
-}
-
-SendDataWithAckFsmBasedFrameExchange::~SendDataWithAckFsmBasedFrameExchange()
-{
-    delete frame;
-    if (ackTimer)
-        delete cancelEvent(ackTimer);
-}
-
-IFrameExchange::FrameProcessingResult SendDataWithAckFsmBasedFrameExchange::handleWithFSM(EventType event, cMessage *frameOrTimer)
-{
-    FrameProcessingResult result = IGNORED;
-    Ieee80211Frame *receivedFrame = event == EVENT_FRAMEARRIVED ? check_and_cast<Ieee80211Frame *>(frameOrTimer) : nullptr;
-
-    FSMA_Switch(fsm) {
-        FSMA_State(INIT) {
-            FSMA_Enter();
-            FSMA_Event_Transition(Start,
-                    event == EVENT_START,
-                    TRANSMITDATA,
-                    transmitDataFrame();
-                    );
-        }
-        FSMA_State(TRANSMITDATA) {
-            FSMA_Enter();
-            FSMA_Event_Transition(Wait - ACK,
-                    event == EVENT_TXFINISHED,
-                    WAITACK,
-                    scheduleAckTimeout();
-                    );
-            FSMA_Event_Transition(Frame - arrived,
-                    event == EVENT_FRAMEARRIVED,
-                    TRANSMITDATA,
-                    ;
-                    );
-        }
-        FSMA_State(WAITACK) {
-            FSMA_Enter();
-            FSMA_Event_Transition(Ack - arrived,
-                    event == EVENT_FRAMEARRIVED && isAck(receivedFrame),
-                    SUCCESS,
-                    result = PROCESSED_DISCARD;
-                    );
-            FSMA_Event_Transition(Frame - arrived,
-                    event == EVENT_FRAMEARRIVED && !isAck(receivedFrame),
-                    FAILURE,
-                    ;
-                    );
-            FSMA_Event_Transition(Ack - timeout - retry,
-                    event == EVENT_TIMER && retryCount < params->getShortRetryLimit(),
-                    TRANSMITDATA,
-                    retryDataFrame();
-                    );
-            FSMA_Event_Transition(Ack - timeout - giveup,
-                    event == EVENT_TIMER && retryCount == params->getShortRetryLimit(),
-                    FAILURE,
-                    ;
-                    );
-        }
-        FSMA_State(SUCCESS) {
-            FSMA_Enter(reportSuccess());
-        }
-        FSMA_State(FAILURE) {
-            FSMA_Enter(reportFailure());
-        }
-    }
-    return result;
-}
-
-void SendDataWithAckFsmBasedFrameExchange::transmitDataFrame()
-{
-    retryCount = 0;
-    AccessCategory ac = accessCategory; // abbreviate
-    contention[txIndex]->transmitContentionFrame(dupPacketAndControlInfo(frame), params->getAifsTime(ac), params->getEifsTime(ac), params->getCwMin(ac), params->getCwMax(ac), params->getSlotTime(), retryCount, this);
-}
-
-void SendDataWithAckFsmBasedFrameExchange::retryDataFrame()
-{
-    retryCount++;
-    frame->setRetry(true);
-    AccessCategory ac = accessCategory; // abbreviate
-    contention[txIndex]->transmitContentionFrame(dupPacketAndControlInfo(frame), params->getAifsTime(ac), params->getEifsTime(ac), params->getCwMin(ac), params->getCwMax(ac), params->getSlotTime(), retryCount, this);
-}
-
-void SendDataWithAckFsmBasedFrameExchange::scheduleAckTimeout()
-{
-    if (ackTimer == nullptr)
-        ackTimer = new cMessage("timeout");
-    simtime_t t = simTime() + utils->getAckFullTimeout();
-    scheduleAt(t, ackTimer);
-}
-
-bool SendDataWithAckFsmBasedFrameExchange::isAck(Ieee80211Frame *frame)
-{
-    return dynamic_cast<Ieee80211ACKFrame *>(frame) != nullptr;
-}
-#endif
-
-//------------------------------
-
 SendDataWithAckFrameExchange::SendDataWithAckFrameExchange(FrameExchangeContext *context, IFinishedCallback *callback, Ieee80211DataOrMgmtFrame *dataFrame, int txIndex, AccessCategory accessCategory) :
     StepBasedFrameExchange(context, callback, txIndex, accessCategory), dataFrame(dataFrame)
 {
@@ -163,10 +57,9 @@ std::string SendDataWithAckFrameExchange::info() const
 void SendDataWithAckFrameExchange::doStep(int step)
 {
     switch (step) {
-        case 0: startContentionIfNeeded(retryCount); break;
-        case 1: transmitFrame(dupPacketAndControlInfo(dataFrame)); break;
-        case 2: expectReplyRxStartWithin(utils->getAckEarlyTimeout()); break;
-        case 3: statistics->frameTransmissionSuccessful(dataFrame, retryCount); releaseChannel(); succeed(); break;
+        case 0: transmitFrame(dupPacketAndControlInfo(dataFrame)); break;
+        case 1: expectReplyRxStartWithin(utils->getAckEarlyTimeout()); break;
+        case 2: statistics->frameTransmissionSuccessful(dataFrame, retryCount); succeed(); break;
         default: ASSERT(false);
     }
 }
@@ -174,7 +67,13 @@ void SendDataWithAckFrameExchange::doStep(int step)
 IFrameExchange::FrameProcessingResult SendDataWithAckFrameExchange::processReply(int step, Ieee80211Frame *frame)
 {
     switch (step) {
-        case 2: if (utils->isAck(frame)) return PROCESSED_DISCARD; else return IGNORED;
+        case 1:
+            if (utils->isAck(frame)) {
+                upperMac->frameTransmissionSucceeded(this, dataFrame, defaultAccessCategory);
+                return PROCESSED_DISCARD;
+            }
+            else
+                return IGNORED;
         default: ASSERT(false); return IGNORED;
     }
 }
@@ -182,33 +81,21 @@ IFrameExchange::FrameProcessingResult SendDataWithAckFrameExchange::processReply
 void SendDataWithAckFrameExchange::processTimeout(int step)
 {
     switch (step) {
-        case 2: retry(); break;
+        case 1:
+            transmissionFailed();
+            break;
         default: ASSERT(false);
     }
 }
 
-void SendDataWithAckFrameExchange::processInternalCollision(int step)
+
+void SendDataWithAckFrameExchange::transmissionFailed()
 {
-    switch (step) {
-        case 0: retry(); break;
-        default: ASSERT(false);
-    }
+    dataFrame->setRetry(true);
+    gotoStep(0);
+    upperMac->frameTransmissionFailed(this, dataFrame, dataFrame, defaultAccessCategory);
 }
 
-void SendDataWithAckFrameExchange::retry()
-{
-    releaseChannel();
-    if (retryCount < params->getShortRetryLimit()) {
-        statistics->frameTransmissionUnsuccessful(dataFrame, retryCount);
-        dataFrame->setRetry(true);
-        retryCount++;
-        gotoStep(0);
-    }
-    else {
-        statistics->frameTransmissionUnsuccessfulGivingUp(dataFrame, retryCount);
-        fail();
-    }
-}
 
 //------------------------------
 
@@ -216,6 +103,7 @@ SendDataWithRtsCtsFrameExchange::SendDataWithRtsCtsFrameExchange(FrameExchangeCo
     StepBasedFrameExchange(context, callback, txIndex, accessCategory), dataFrame(dataFrame)
 {
     dataFrame->setDuration(params->getSifsTime() + utils->getAckDuration());
+    rtsFrame = utils->buildRtsFrame(dataFrame);
 }
 
 SendDataWithRtsCtsFrameExchange::~SendDataWithRtsCtsFrameExchange()
@@ -236,12 +124,11 @@ std::string SendDataWithRtsCtsFrameExchange::info() const
 void SendDataWithRtsCtsFrameExchange::doStep(int step)
 {
     switch (step) {
-        case 0: startContentionIfNeeded(shortRetryCount); break;
-        case 1: transmitFrame(utils->buildRtsFrame(dataFrame)); break;
-        case 2: expectReplyRxStartWithin(utils->getCtsEarlyTimeout()); break;
-        case 3: transmitFrame(dupPacketAndControlInfo(dataFrame), params->getSifsTime()); break;
-        case 4: expectReplyRxStartWithin(utils->getAckEarlyTimeout()); break;
-        case 5: statistics->frameTransmissionSuccessful(dataFrame, longRetryCount); releaseChannel(); succeed(); break;
+        case 0: transmitFrame(dupPacketAndControlInfo(rtsFrame)); break;
+        case 1: expectReplyRxStartWithin(utils->getCtsEarlyTimeout()); break;
+        case 2: transmitFrame(dupPacketAndControlInfo(dataFrame), params->getSifsTime()); break;
+        case 3: expectReplyRxStartWithin(utils->getAckEarlyTimeout()); break;
+        case 4: /*statistics->frameTransmissionSuccessful(dataFrame, longRetryCount);*/ succeed(); break;
         default: ASSERT(false);
     }
 }
@@ -249,8 +136,20 @@ void SendDataWithRtsCtsFrameExchange::doStep(int step)
 IFrameExchange::FrameProcessingResult SendDataWithRtsCtsFrameExchange::processReply(int step, Ieee80211Frame *frame)
 {
     switch (step) {
-        case 2: if (utils->isCts(frame)) return PROCESSED_DISCARD; else return IGNORED;
-        case 4: if (utils->isAck(frame)) return PROCESSED_DISCARD; else return IGNORED;
+        case 1:
+            if (utils->isCts(frame)) {
+                upperMac->frameTransmissionSucceeded(this, rtsFrame, defaultAccessCategory);
+                return PROCESSED_DISCARD;
+            }
+            else
+                return IGNORED;
+        case 3:
+            if (utils->isAck(frame)) {
+                upperMac->frameTransmissionSucceeded(this, dataFrame, defaultAccessCategory);
+                return PROCESSED_DISCARD;
+            }
+            else
+                return IGNORED;
         default: ASSERT(false); return IGNORED;
     }
 }
@@ -258,46 +157,18 @@ IFrameExchange::FrameProcessingResult SendDataWithRtsCtsFrameExchange::processRe
 void SendDataWithRtsCtsFrameExchange::processTimeout(int step)
 {
     switch (step) {
-        case 2: retryRtsCts(); break;
-        case 4: retryData(); break;
+        case 1: transmissionFailed(dataFrame, rtsFrame); break;
+        case 3: transmissionFailed(dataFrame, dataFrame); break;
         default: ASSERT(false);
     }
 }
 
-void SendDataWithRtsCtsFrameExchange::processInternalCollision(int step)
+void SendDataWithRtsCtsFrameExchange::transmissionFailed(Ieee80211Frame* dataFrame, Ieee80211Frame* failedFrame)
 {
-    switch (step) {
-        case 0: retryRtsCts(); break;
-        default: ASSERT(false);
-    }
-}
-
-void SendDataWithRtsCtsFrameExchange::retryRtsCts()
-{
-    releaseChannel();
-    if (shortRetryCount < params->getShortRetryLimit()) {
-        shortRetryCount++;
-        gotoStep(0);
-    }
-    else {
-        statistics->frameTransmissionGivenUp(dataFrame);
-        fail();
-    }
-}
-
-void SendDataWithRtsCtsFrameExchange::retryData()
-{
-    releaseChannel();
-    if (longRetryCount < params->getLongRetryLimit()) {
-        statistics->frameTransmissionUnsuccessful(dataFrame, longRetryCount);
-        dataFrame->setRetry(true);
-        longRetryCount++;
-        gotoStep(0);
-    }
-    else {
-        statistics->frameTransmissionUnsuccessfulGivingUp(dataFrame, longRetryCount);
-        fail();
-    }
+    if (failedFrame->getType() == ST_DATA)
+        failedFrame->setRetry(true);
+    gotoStep(0);
+    upperMac->frameTransmissionFailed(this, dataFrame, failedFrame, defaultAccessCategory);
 }
 
 //------------------------------
@@ -324,47 +195,25 @@ void SendMulticastDataFrameExchange::handleSelfMessage(cMessage *msg)
     ASSERT(false);
 }
 
-void SendMulticastDataFrameExchange::start()
+void SendMulticastDataFrameExchange::startFrameExchange()
 {
-    startContentionIfNeeded();
+
 }
 
-void SendMulticastDataFrameExchange::startContention()
-{
-    AccessCategory ac = accessCategory;  // abbreviate
-    contention[txIndex]->startContention(params->getAifsTime(ac), params->getEifsTime(ac), params->getCwMulticast(ac), params->getCwMulticast(ac), params->getSlotTime(), 0, this);
-}
-
-void SendMulticastDataFrameExchange::startContentionIfNeeded()
-{
-    if (!contention[txIndex]->isOwning())
-        startContention();
-    else
-        tx->transmitFrame(dupPacketAndControlInfo(dataFrame), SIMTIME_ZERO, this);
-}
-
-void SendMulticastDataFrameExchange::internalCollision(int txIndex)
-{
-    if (++retryCount < params->getShortRetryLimit()) {
-        dataFrame->setRetry(true);
-        startContention();
-    }
-    else {
-        reportFailure();
-    }
-}
-
-void SendMulticastDataFrameExchange::channelAccessGranted(int txIndex)
+void SendMulticastDataFrameExchange::continueFrameExchange()
 {
     tx->transmitFrame(dupPacketAndControlInfo(dataFrame), SIMTIME_ZERO, this);
 }
 
-void SendMulticastDataFrameExchange::transmissionComplete()
+void SendMulticastDataFrameExchange::abortFrameExchange()
 {
-    releaseChannel(txIndex);
-    reportSuccess();
+    reportFailure();
 }
 
+void SendMulticastDataFrameExchange::transmissionComplete()
+{
+    reportSuccess();
+}
 
 } // namespace ieee80211
 } // namespace inet

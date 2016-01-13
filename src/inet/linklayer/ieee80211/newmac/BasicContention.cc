@@ -106,6 +106,20 @@ void BasicContention::startContention(simtime_t ifs, simtime_t eifs, int cwMin, 
     handleWithFSM(START, nullptr);
 }
 
+void BasicContention::startContention(simtime_t ifs, simtime_t eifs, simtime_t slotTime, int cw, IContentionCallback* callback)
+{
+    Enter_Method("startContention()");
+    ASSERT(fsm.getState() == IDLE);
+    this->ifs = ifs;
+    this->eifs = eifs;
+    this->slotTime = slotTime;
+    this->callback = callback;
+
+    backoffSlots = intrand(cw + 1);
+    handleWithFSM(START, nullptr);
+}
+
+
 int BasicContention::computeCw(int cwMin, int cwMax, int retryCount)
 {
     int cw = ((cwMin + 1) << retryCount) - 1;

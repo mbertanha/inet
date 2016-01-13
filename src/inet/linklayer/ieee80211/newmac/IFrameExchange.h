@@ -21,6 +21,8 @@
 #define __INET_IFRAMEEXCHANGE_H
 
 #include "inet/common/INETDefs.h"
+#include "inet/linklayer/ieee80211/mac/Ieee80211Frame_m.h"
+#include "AccessCategory.h"
 
 namespace inet {
 namespace ieee80211 {
@@ -34,9 +36,11 @@ class Ieee80211Frame;
 class INET_API IFrameExchange
 {
     public:
-        class INET_API IFinishedCallback {
+        class INET_API IFinishedCallback { // TODO:  change name IFrameExchangeCallback
             public:
                 virtual void frameExchangeFinished(IFrameExchange *what, bool successful) = 0;
+                virtual void frameTransmissionFailed(IFrameExchange *what, Ieee80211Frame *dataFrame, Ieee80211Frame *failedFrame, AccessCategory ac) = 0;
+                virtual void frameTransmissionSucceeded(IFrameExchange *what, Ieee80211Frame *frame, AccessCategory ac) = 0;
                 virtual ~IFinishedCallback() {}
         };
 
@@ -44,7 +48,11 @@ class INET_API IFrameExchange
 
     public:
         virtual ~IFrameExchange() {}
-        virtual void start() = 0;
+        virtual void startFrameExchange() = 0;
+        virtual void continueFrameExchange() = 0;
+        virtual void abortFrameExchange() = 0;
+        virtual Ieee80211DataOrMgmtFrame *getDataFrame() = 0;
+        virtual Ieee80211Frame *getFirstFrame() = 0;
         virtual FrameProcessingResult lowerFrameReceived(Ieee80211Frame *frame) = 0;
         virtual void corruptedOrNotForUsFrameReceived() = 0;
 };
