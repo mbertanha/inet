@@ -1,0 +1,91 @@
+//
+// Copyright (C) 2006 Andras Varga
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+//
+
+package inet.tutorials.visualization;
+
+import inet.common.geometry.common.OsgGeographicCoordinateSystem;
+import inet.environment.common.PhysicalEnvironment;
+import inet.networklayer.configurator.ipv4.IPv4NetworkConfigurator;
+import inet.node.ethernet.Eth1G;
+import inet.node.inet.Router;
+import inet.node.inet.StandardHost;
+import inet.node.inet.WirelessHost;
+import inet.node.wireless.AccessPoint;
+import inet.physicallayer.ieee80211.packetlevel.Ieee80211ScalarRadioMedium;
+import inet.visualizer.integrated.IntegratedVisualizer;
+
+network VisualizationTutorialA
+{
+    parameters:
+        @display("bgb=0,0");
+    submodules:
+        physicalEnvironment: PhysicalEnvironment {
+            parameters:
+                @display("p=100,50");
+        }
+        configurator: IPv4NetworkConfigurator {
+            parameters:
+                @display("p=100,150");
+        }
+        radioMedium: Ieee80211ScalarRadioMedium {
+            parameters:
+                @display("p=100,250");
+        }
+        server[2]: StandardHost {
+            parameters:
+                @display("p=300,100");
+        }
+        router: Router {
+            parameters:
+                @display("p=300,200");
+        }
+        accessPoint: AccessPoint {
+            parameters:
+                @display("p=300,300");
+        }
+        client[2]: WirelessHost {
+            parameters:
+                @display("p=300,400");
+        }
+    connections:
+        accessPoint.ethg++ <--> Eth1G <--> router.ethg++;
+        router.ethg++ <--> Eth1G <--> server[0].ethg++;
+        router.ethg++ <--> Eth1G <--> server[1].ethg++;
+}
+
+network VisualizationTutorialB extends VisualizationTutorialA
+{
+    parameters:
+        @display("bgb=0,0");
+    submodules:
+        visualizer: IntegratedVisualizer {
+            parameters:
+                @display("p=100,350");
+        }
+}
+
+network VisualizationTutorialC extends VisualizationTutorialB
+{
+    parameters:
+        @display("bgb=0,0");
+    submodules:
+        coordinateSystem: OsgGeographicCoordinateSystem {
+            parameters:
+                @display("p=100,450");
+        }
+}
