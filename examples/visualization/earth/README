@@ -1,0 +1,10 @@
+This example demonstrates how to display some part of the Earth in a simulation.
+This example requires the OSG Earth support of OMNeT++ 5.0 or later.
+
+In fact, the example doesn't contain any communication related modules such as
+network nodes. It only contains two toplevel modules: a geographic coordinate
+system, and a visualizer. This example also demonstrates that network nodes are
+not essential for such a visualization.
+
+When you run the example, you should see the detailed map of Boston downtown.
+Something like this: https://www.openstreetmap.org/#map=17/42.35685/-71.06632
