@@ -355,6 +355,11 @@ bool Contention::isOwning()
     return fsm.getState() == OWNING;
 }
 
+bool Contention::isContentionInProgress()
+{
+    return fsm.getState() != IDLE;
+}
+
 } // namespace ieee80211
 } // namespace inet
 
