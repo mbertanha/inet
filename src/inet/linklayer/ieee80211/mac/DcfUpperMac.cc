@@ -52,6 +52,7 @@ DcfUpperMac::~DcfUpperMac()
     delete duplicateDetection;
     delete fragmenter;
     delete reassembly;
+    delete txRetryHandler;
 }
 
 void DcfUpperMac::initialize()
@@ -82,6 +83,7 @@ void DcfUpperMac::initialize()
     duplicateDetection = new NonQoSDuplicateDetector(); //TODO or LegacyDuplicateDetector();
     fragmenter = check_and_cast<IFragmenter *>(inet::utils::createOne(par("fragmenterClass")));
     reassembly = check_and_cast<IReassembly *>(inet::utils::createOne(par("reassemblyClass")));
+    txRetryHandler = new UpperMacTxRetryHandler(params, AC_LEGACY);
 
     WATCH(maxQueueSize);
     WATCH(fragmentationThreshold);
@@ -149,7 +151,6 @@ void DcfUpperMac::assignSequenceNumber(Ieee80211DataOrMgmtFrame* frame)
 {
     duplicateDetection->assignSequenceNumber(frame);
 }
-
 
 Ieee80211DataOrMgmtFrame *DcfUpperMac::aggregateIfPossible()
 {
@@ -267,12 +268,25 @@ void DcfUpperMac::channelAccessGranted(int txIndex)
 {
     Enter_Method("channelAccessGranted()");
     if (frameExchange)
-    {
-        IContentionCallback *contentionCallback = (IContentionCallback *)frameExchange;
-        contentionCallback->channelAccessGranted(0);
-    }
+        frameExchange->continueFrameExchange();
     else
         startSendDataFrameExchange(dequeue(), 0, AC_LEGACY);
+}
+
+void DcfUpperMac::frameTransmissionFailed(IFrameExchange* what, Ieee80211Frame* dataFrame, Ieee80211Frame *failedFrame, AccessCategory ac)
+{
+    contention[0]->channelReleased();
+    txRetryHandler->frameTransmissionFailed(dataFrame, failedFrame); // increments retry counters
+    if (txRetryHandler->isRetryPossible(dataFrame, failedFrame))
+        startContention();
+    else
+        frameExchange->abortFrameExchange();
+}
+
+void DcfUpperMac::frameTransmissionSucceeded(IFrameExchange* what, Ieee80211Frame* frame, AccessCategory ac)
+{
+    // TODO: statistic, log
+    txRetryHandler->frameTransmissionSucceeded(frame);
 }
 
 void DcfUpperMac::internalCollision(int txIndex)
@@ -314,12 +328,13 @@ void DcfUpperMac::startSendDataFrameExchange(Ieee80211DataOrMgmtFrame *frame, in
         frameExchange = new SendDataWithRtsCtsFrameExchange(&context, this, frame, txIndex, ac);
     else
         frameExchange = new SendDataWithAckFrameExchange(&context, this, frame, txIndex, ac);
-    frameExchange->start();
+    frameExchange->startFrameExchange();
 }
 
 void DcfUpperMac::frameExchangeFinished(IFrameExchange *what, bool successful)
 {
     EV_INFO << "Frame exchange finished" << std::endl;
+    contention[0]->channelReleased();
     delete frameExchange;
     frameExchange = nullptr;
     if (!transmissionQueue.empty())
@@ -328,7 +343,8 @@ void DcfUpperMac::frameExchangeFinished(IFrameExchange *what, bool successful)
 
 void DcfUpperMac::startContention()
 {
-    contention[0]->startContention(params->getAifsTime(AC_LEGACY), params->getEifsTime(AC_LEGACY), params->getCwMulticast(AC_LEGACY), params->getCwMulticast(AC_LEGACY), params->getSlotTime(), 0, this);
+    // TODO: multicast cw??
+    contention[0]->startContention(params->getAifsTime(AC_LEGACY), params->getEifsTime(AC_LEGACY), params->getSlotTime(), txRetryHandler->getCw(), this);
 }
 
 

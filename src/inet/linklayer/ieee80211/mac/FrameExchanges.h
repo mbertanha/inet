@@ -27,48 +27,21 @@ namespace ieee80211 {
 
 class Ieee80211DataOrMgmtFrame;
 
-#if 0
-// just to demonstrate the use FsmBasedFrameExchange; otherwise we prefer the step-based because it's simpler
-class INET_API SendDataWithAckFsmBasedFrameExchange : public FsmBasedFrameExchange
-{
-    protected:
-        Ieee80211DataOrMgmtFrame *frame;
-        int txIndex;
-        AccessCategory accessCategory;
-        cMessage *ackTimer = nullptr;
-        int retryCount = 0;
-
-        enum State { INIT, TRANSMITDATA, WAITACK, SUCCESS, FAILURE };
-        State state = INIT;
-
-    protected:
-        FrameProcessingResult handleWithFSM(EventType event, cMessage *frameOrTimer) override;
-
-        void transmitDataFrame();
-        void retryDataFrame();
-        void scheduleAckTimeout();
-        bool isAck(Ieee80211Frame *frame);
-
-    public:
-        SendDataWithAckFsmBasedFrameExchange(FrameExchangeContext *context, IFinishedCallback *callback, Ieee80211DataOrMgmtFrame *frame, int txIndex, AccessCategory accessCategory);
-        ~SendDataWithAckFsmBasedFrameExchange();
-};
-#endif
-
 class INET_API SendDataWithAckFrameExchange : public StepBasedFrameExchange
 {
     protected:
         Ieee80211DataOrMgmtFrame *dataFrame = nullptr;
         int retryCount = 0;
     protected:
-        virtual void retry();
+        virtual void transmissionFailed();
         virtual void doStep(int step) override;
         virtual FrameProcessingResult processReply(int step, Ieee80211Frame *frame) override;
         virtual void processTimeout(int step) override;
-        virtual void processInternalCollision(int step) override;
     public:
         SendDataWithAckFrameExchange(FrameExchangeContext *context, IFinishedCallback *callback, Ieee80211DataOrMgmtFrame *dataFrame, int txIndex, AccessCategory accessCategory);
         ~SendDataWithAckFrameExchange();
+        virtual Ieee80211DataOrMgmtFrame *getDataFrame() override { return dataFrame; }
+        virtual Ieee80211Frame *getFirstFrame() override { return dataFrame; }
         virtual std::string info() const override;
 };
 
@@ -76,19 +49,19 @@ class INET_API SendDataWithRtsCtsFrameExchange : public StepBasedFrameExchange
 {
     protected:
         Ieee80211DataOrMgmtFrame *dataFrame = nullptr;
-        int shortRetryCount = 0;
-        int longRetryCount = 0;
+        Ieee80211RTSFrame *rtsFrame = nullptr;
+
     protected:
         virtual void doStep(int step) override;
         virtual FrameProcessingResult processReply(int step, Ieee80211Frame *frame) override;
         virtual void processTimeout(int step) override;
-        virtual void processInternalCollision(int step) override;
-        virtual void retryRtsCts();
-        virtual void retryData();
+        virtual void transmissionFailed(Ieee80211Frame *dataFrame, Ieee80211Frame *failedFrame);
 
     public:
         SendDataWithRtsCtsFrameExchange(FrameExchangeContext *context, IFinishedCallback *callback, Ieee80211DataOrMgmtFrame *dataFrame, int txIndex, AccessCategory accessCategory);
         ~SendDataWithRtsCtsFrameExchange();
+        virtual Ieee80211DataOrMgmtFrame *getDataFrame() override { return dataFrame; }
+        virtual Ieee80211Frame *getFirstFrame() override { return rtsFrame; }
         virtual std::string info() const override;
 };
 
@@ -98,18 +71,18 @@ class INET_API SendMulticastDataFrameExchange : public FrameExchange
         Ieee80211DataOrMgmtFrame *dataFrame;
         int txIndex;
         AccessCategory accessCategory;
-        int retryCount = 0;
-    protected:
-        virtual void startContention();
+
     public:
         SendMulticastDataFrameExchange(FrameExchangeContext *context, IFinishedCallback *callback, Ieee80211DataOrMgmtFrame *dataFrame, int txIndex, AccessCategory accessCategory);
         ~SendMulticastDataFrameExchange();
-        virtual void start() override;
-        virtual void channelAccessGranted(int txIndex) override;
-        virtual void internalCollision(int txIndex) override;
+        virtual void startFrameExchange() override;
+        virtual void continueFrameExchange() override;
+        virtual void abortFrameExchange() override;
         virtual void transmissionComplete() override;
         virtual void handleSelfMessage(cMessage* timer) override;
         virtual std::string info() const override;
+        virtual Ieee80211DataOrMgmtFrame *getDataFrame() override { return dataFrame; }
+        virtual Ieee80211Frame *getFirstFrame() override { return dataFrame; }
 };
 
 } // namespace ieee80211

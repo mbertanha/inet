@@ -57,8 +57,10 @@ EdcaUpperMac::~EdcaUpperMac()
     int numACs = params->isEdcaEnabled() ? 4 : 1;
     for (int i = 0; i < numACs; i++) {
         delete acData[i].frameExchange;
+        delete txRetryHandler[i];
     }
     delete[] acData;
+    delete[] txRetryHandler;
 }
 
 void EdcaUpperMac::initialize()
@@ -95,6 +97,11 @@ void EdcaUpperMac::initialize()
     duplicateDetection = new QoSDuplicateDetector();
     fragmenter = check_and_cast<IFragmenter *>(inet::utils::createOne(par("fragmenterClass")));
     reassembly = check_and_cast<IReassembly *>(inet::utils::createOne(par("reassemblyClass")));
+
+    txRetryHandler = new UpperMacTxRetryHandler*[numACs];
+    for (int i = 0; i < numACs; i++) {
+        txRetryHandler[i] = new UpperMacTxRetryHandler(params, AccessCategory(i));
+    }
 
     WATCH(maxQueueSize);
     WATCH(fragmentationThreshold);
@@ -331,26 +338,56 @@ void EdcaUpperMac::corruptedFrameReceived()
 void EdcaUpperMac::channelAccessGranted(int txIndex)
 {
     Enter_Method("channelAccessGranted()");
-    startSendDataFrameExchange(dequeue((AccessCategory)txIndex), txIndex, (AccessCategory)txIndex);
+    if (acData[txIndex].frameExchange)
+    {
+        IContentionCallback *contentionCallback = (IContentionCallback *)acData[txIndex].frameExchange;
+        contentionCallback->channelAccessGranted(txIndex);
+    }
+    else
+        startSendDataFrameExchange(dequeue((AccessCategory)txIndex), txIndex, (AccessCategory)txIndex);
 }
 
 void EdcaUpperMac::internalCollision(int txIndex)
 {
     Enter_Method("internalCollision()");
-    // FIXME: double the contention window!
-    // FIXME: increment the retry counts!
-    if (acData[txIndex].frameExchange)
-    {
-        IContentionCallback *contentionCallback = (IContentionCallback *)acData[txIndex].frameExchange;
-        contentionCallback->internalCollision(txIndex);
+    if (acData[txIndex].frameExchange) {
+        Ieee80211Frame *dataFrame = acData[txIndex].frameExchange->getDataFrame();
+        Ieee80211Frame *firstFrame = acData[txIndex].frameExchange->getDataFrame();
+        txRetryHandler[txIndex]->frameTransmissionFailed(dataFrame, firstFrame); // Note: failedFrame = firstFrame
+        if (txRetryHandler[txIndex]->isRetryPossible(dataFrame, firstFrame))
+            startContention((AccessCategory)txIndex);
+        else
+            acData[txIndex].frameExchange->abortFrameExchange();
     }
-    else
-        startContention((AccessCategory)txIndex); // TODO: Review it! I don't know what is the correct procedure in this case.
+    else {
+        Ieee80211DataOrMgmtFrame *dataFrame = (Ieee80211DataOrMgmtFrame *)acData[txIndex].transmissionQueue.front();
+        txRetryHandler[txIndex]->frameTransmissionFailed(dataFrame, dataFrame); // increments retry counters
+        if (txRetryHandler[txIndex]->isRetryPossible(dataFrame, dataFrame))
+            startContention((AccessCategory)txIndex);
+        else {
+            // delete first frame from queue assuming a SendDataFrameWithAckFrameExchange would have been used
+            acData[txIndex].transmissionQueue.pop();
+        }
+    }
 }
 
 void EdcaUpperMac::startContention(AccessCategory ac)
 {
     contention[ac]->startContention(params->getAifsTime(ac), params->getEifsTime(ac), params->getCwMulticast(ac), params->getCwMulticast(ac), params->getSlotTime(), 0, this);
+}
+
+void EdcaUpperMac::frameTransmissionFailed(IFrameExchange* what, Ieee80211Frame *dataFrame, Ieee80211Frame *failedFrame, AccessCategory ac)
+{
+    contention[ac]->channelReleased();
+    txRetryHandler[ac]->frameTransmissionFailed(dataFrame, failedFrame); // increments retry counters
+    if (txRetryHandler[ac]->isRetryPossible(dataFrame, failedFrame))
+        startContention(ac);
+}
+
+void EdcaUpperMac::frameTransmissionSucceeded(IFrameExchange* what, Ieee80211Frame* frame, AccessCategory ac)
+{
+    // TODO: statistic, log
+    txRetryHandler[ac]->frameTransmissionSucceeded(frame);
 }
 
 void EdcaUpperMac::transmissionComplete(ITxCallback *callback)
@@ -387,22 +424,22 @@ void EdcaUpperMac::startSendDataFrameExchange(Ieee80211DataOrMgmtFrame *frame, i
     else
         frameExchange = new SendDataWithAckFrameExchange(&context, this, frame, txIndex, ac);
 
-    frameExchange->start();
+    frameExchange->startFrameExchange();
     acData[ac].frameExchange = frameExchange;
 }
 
 void EdcaUpperMac::frameExchangeFinished(IFrameExchange *what, bool successful)
 {
     EV_INFO << "Frame exchange finished" << std::endl;
-
     // find ac for this frame exchange
     int numACs = params->isEdcaEnabled() ? 4 : 1;
     AccessCategory ac = (AccessCategory) -1;
     for (int i = 0; i < numACs; i++)
         if (acData[i].frameExchange == what)
             ac = (AccessCategory)i;
-    ASSERT((int)ac != -1);
+    ASSERT(ac != -1); // TODO: getAc() ??
 
+    contention[ac]->channelReleased();
     delete acData[ac].frameExchange;
     acData[ac].frameExchange = nullptr;
 

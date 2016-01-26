@@ -25,6 +25,7 @@
 #include "AccessCategory.h"
 #include "ITxCallback.h"
 #include "inet/physicallayer/ieee80211/mode/IIeee80211Mode.h"
+#include "UpperMacTxRetryHandler.h"
 
 using namespace inet::physicallayer;
 
@@ -64,6 +65,7 @@ class INET_API DcfUpperMac : public cSimpleModule, public IUpperMac, public ICon
         IRx *rx = nullptr;
         ITx *tx;
         IContention **contention;
+        UpperMacTxRetryHandler *txRetryHandler = nullptr;
 
         int maxQueueSize;
         int fragmentationThreshold = 2346;
@@ -89,8 +91,12 @@ class INET_API DcfUpperMac : public cSimpleModule, public IUpperMac, public ICon
         bool fragmentIfPossible(Ieee80211DataOrMgmtFrame *nextFrame, bool aMsduPresent);
         void assignSequenceNumber(Ieee80211DataOrMgmtFrame *frame);
         virtual void startSendDataFrameExchange(Ieee80211DataOrMgmtFrame *frame, int txIndex, AccessCategory ac);
-        virtual void frameExchangeFinished(IFrameExchange *what, bool successful) override;
         virtual void startContention();
+
+        // IFinishedCallback
+        virtual void frameExchangeFinished(IFrameExchange *what, bool successful) override;
+        virtual void frameTransmissionFailed(IFrameExchange *what, Ieee80211Frame* dataFrame, Ieee80211Frame *failedFrame, AccessCategory ac) override;
+        virtual void frameTransmissionSucceeded(IFrameExchange *what, Ieee80211Frame *frame, AccessCategory ac) override;
 
         void sendAck(Ieee80211DataOrMgmtFrame *frame);
         void sendCts(Ieee80211RTSFrame *frame);
