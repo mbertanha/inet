@@ -197,12 +197,11 @@ void SendMulticastDataFrameExchange::handleSelfMessage(cMessage *msg)
 
 void SendMulticastDataFrameExchange::startFrameExchange()
 {
-
+    tx->transmitFrame(dupPacketAndControlInfo(dataFrame), SIMTIME_ZERO, this);
 }
 
 void SendMulticastDataFrameExchange::continueFrameExchange()
 {
-    tx->transmitFrame(dupPacketAndControlInfo(dataFrame), SIMTIME_ZERO, this);
 }
 
 void SendMulticastDataFrameExchange::abortFrameExchange()
