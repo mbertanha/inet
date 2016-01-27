@@ -125,6 +125,7 @@ void DcfUpperMac::handleMessage(cMessage *msg)
         ((MacPlugin *)msg->getContextPointer())->handleSelfMessage(msg);
     else
         ASSERT(false);
+    cleanupFrameExchanges();
 }
 
 void DcfUpperMac::upperFrameReceived(Ieee80211DataOrMgmtFrame *frame)
@@ -143,6 +144,7 @@ void DcfUpperMac::upperFrameReceived(Ieee80211DataOrMgmtFrame *frame)
     enqueue(frame);
     if (!contention[0]->isContentionInProgress())
         startContention();
+    cleanupFrameExchanges();
 }
 
 void DcfUpperMac::enqueue(Ieee80211DataOrMgmtFrame *frame)
@@ -259,6 +261,7 @@ void DcfUpperMac::lowerFrameReceived(Ieee80211Frame *frame)
             delete frame;
         }
     }
+    cleanupFrameExchanges();
 }
 
 void DcfUpperMac::corruptedFrameReceived()
@@ -292,6 +295,16 @@ void DcfUpperMac::frameTransmissionSucceeded(IFrameExchange* what, Ieee80211Fram
     txRetryHandler->frameTransmissionSucceeded(frame);
 }
 
+void DcfUpperMac::cleanupFrameExchanges()
+{
+    if (finished)
+    {
+        delete frameExchange;
+        frameExchange = nullptr;
+        finished = false;
+    }
+}
+
 void DcfUpperMac::internalCollision(int txIndex)
 {
     Enter_Method("internalCollision()");
@@ -319,12 +332,13 @@ void DcfUpperMac::startSendDataFrameExchange(Ieee80211DataOrMgmtFrame *frame, in
     context.ownerModule = this;
     context.params = params;
     context.utils = utils;
-    context.contention = contention;
     context.tx = tx;
     context.rx = rx;
     context.statistics = statistics;
 
     bool useRtsCts = frame->getByteLength() > params->getRtsThreshold();
+    if (frameExchange)
+        throw cRuntimeError("Frame exchange must be a nullptr");
     if (utils->isBroadcastOrMulticast(frame))
         frameExchange = new SendMulticastDataFrameExchange(&context, this, frame, txIndex, ac);
     else if (useRtsCts)
@@ -338,8 +352,7 @@ void DcfUpperMac::frameExchangeFinished(IFrameExchange *what, bool successful)
 {
     EV_INFO << "Frame exchange finished" << std::endl;
     contention[0]->channelReleased();
-    delete frameExchange;
-    frameExchange = nullptr;
+    finished = true;
     if (!transmissionQueue.empty())
         startContention();
 }

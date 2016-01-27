@@ -72,6 +72,7 @@ class INET_API DcfUpperMac : public cSimpleModule, public IUpperMac, public ICon
 
         cQueue transmissionQueue;
         IFrameExchange *frameExchange = nullptr;
+        bool finished = false;
         IDuplicateDetector *duplicateDetection = nullptr;
         IMsduAggregation *msduAggregator = nullptr;
         IFragmenter *fragmenter = nullptr;
@@ -100,6 +101,7 @@ class INET_API DcfUpperMac : public cSimpleModule, public IUpperMac, public ICon
 
         void sendAck(Ieee80211DataOrMgmtFrame *frame);
         void sendCts(Ieee80211RTSFrame *frame);
+        void cleanupFrameExchanges();
 
     public:
         DcfUpperMac();
