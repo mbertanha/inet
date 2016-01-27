@@ -73,6 +73,7 @@ class INET_API EdcaUpperMac : public cSimpleModule, public IUpperMac, public ICo
         struct AccessCategoryData {
             cQueue transmissionQueue;
             IFrameExchange *frameExchange = nullptr;
+            bool finished = false;
         };
         AccessCategoryData *acData = nullptr;  // dynamically allocated array
 
@@ -105,6 +106,8 @@ class INET_API EdcaUpperMac : public cSimpleModule, public IUpperMac, public ICo
 
         void sendAck(Ieee80211DataOrMgmtFrame *frame);
         void sendCts(Ieee80211RTSFrame *frame);
+
+        void cleanupFrameExchanges();
 
     public:
         EdcaUpperMac();
