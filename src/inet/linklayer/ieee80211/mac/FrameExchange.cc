@@ -32,7 +32,6 @@ FrameExchange::FrameExchange(FrameExchangeContext *context, IFinishedCallback *c
     params(context->params),
     utils(context->utils),
     tx(context->tx),
-    contention(context->contention),
     rx(context->rx),
     statistics(context->statistics),
     upperMac(callback)
@@ -160,10 +159,9 @@ void StepBasedFrameExchange::proceed()
             if (operation == GOTO_STEP)
                 proceed();
         }
-        else {
-            cleanupAndReportResult(); // should be the last call in the lifetime of the object
-        }
     }
+    else
+        throw cRuntimeError("Frame exchange finished");
 }
 
 void StepBasedFrameExchange::transmissionComplete()
@@ -192,9 +190,6 @@ IFrameExchange::FrameProcessingResult StepBasedFrameExchange::lowerFrameReceived
             else
                 operation = EXPECT_FULL_REPLY; // restore
         }
-        else {
-            cleanupAndReportResult(); // should be the last call in the lifetime of the object
-        }
         return result;
     }
     else if (operation == EXPECT_REPLY_RXSTART) {
@@ -213,9 +208,6 @@ IFrameExchange::FrameProcessingResult StepBasedFrameExchange::lowerFrameReceived
                 else
                     handleTimeout();  // frame being received when timeout expired was not accepted as response: declare timeout
             }
-        }
-        else {
-            cleanupAndReportResult(); // should be the last call in the lifetime of the object
         }
         return result;
     }
@@ -267,9 +259,6 @@ void StepBasedFrameExchange::handleTimeout()
         logStatus("processTimeout()");
         checkOperation(operation, "processTimeout()");
     }
-    else {
-        cleanupAndReportResult(); // should be the last call in the lifetime of the object
-    }
 }
 
 void StepBasedFrameExchange::continueFrameExchange()
@@ -282,19 +271,6 @@ void StepBasedFrameExchange::abortFrameExchange()
 {
     //statistics->frameTransmissionUnsuccessfulGivingUp(dataFrame, longRetryCount); // TOOD: fix longRetryCount, dataFrame
     fail(); // TODO: giveUp
-    cleanupAndReportResult();
-}
-
-void StepBasedFrameExchange::cleanupAndReportResult()
-{
-    cleanup();
-    switch (status) {
-        case SUCCEEDED: reportSuccess(); break;
-        case FAILED: reportFailure(); break;
-        default: ASSERT(false);
-    }
-    // NOTE: no members or methods may be accessed after this point, because the
-    // success/failure callback might has probably deleted the frame exchange object!
 }
 
 void StepBasedFrameExchange::transmitFrame(Ieee80211Frame *frame)
@@ -335,22 +311,22 @@ void StepBasedFrameExchange::fail()
 {
     setOperation(FAIL);
     status = FAILED;
-    // note: we cannot call reportFailure() right here as it might delete the frame exchange object
+    reportFailure();
 }
 
 void StepBasedFrameExchange::succeed()
 {
     setOperation(SUCCEED);
     status = SUCCEEDED;
-    // note: we cannot call reportSuccess() right here as it might delete the frame exchange object
+    reportSuccess();
 }
 
 void StepBasedFrameExchange::setOperation(Operation newOperation)
 {
     if (status != INPROGRESS)
         throw cRuntimeError(this, "cannot do operation %s: frame exchange already terminated (%s)", operationFunctionName(newOperation), statusName(status));
-    if (operation != NONE)
-        throw cRuntimeError(this, "only one operation is permitted per step: cannot do %s after %s, in doStep(step=%d)", operationFunctionName(newOperation), operationFunctionName(operation), step);
+    /*if (operation != NONE)
+        throw cRuntimeError(this, "only one operation is permitted per step: cannot do %s after %s, in doStep(step=%d)", operationFunctionName(newOperation), operationFunctionName(operation), step);*/
     operation = newOperation;
 }
 

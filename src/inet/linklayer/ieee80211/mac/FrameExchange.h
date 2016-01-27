@@ -42,7 +42,6 @@ class INET_API FrameExchangeContext
         IMacParameters *params = nullptr;
         MacUtils *utils = nullptr;
         ITx *tx = nullptr;
-        IContention **contention = nullptr; // todo: delete
         IRx *rx = nullptr;
         IStatistics *statistics = nullptr;
 };
@@ -56,7 +55,6 @@ class INET_API FrameExchange : public MacPlugin, public IFrameExchange, public I
         IMacParameters *params;
         MacUtils *utils;
         ITx *tx;
-        IContention **contention; // todo: delete
         IRx *rx;
         IStatistics *statistics;
         IFinishedCallback *upperMac = nullptr;
@@ -109,7 +107,6 @@ class INET_API StepBasedFrameExchange : public FrameExchange
         virtual void logStatus(const char *what);
         virtual void checkOperation(Operation stepType, const char *where);
         virtual void handleTimeout();
-        virtual void cleanupAndReportResult();
         static const char *statusName(Status status);
         static const char *operationName(Operation operation);
         static const char *operationFunctionName(Operation operation);
@@ -123,7 +120,6 @@ class INET_API StepBasedFrameExchange : public FrameExchange
         virtual void abortFrameExchange() override;
         virtual FrameProcessingResult lowerFrameReceived(Ieee80211Frame *frame) override;
         virtual void corruptedOrNotForUsFrameReceived() override;
-        //virtual void internalCollision(int txIndex); // TODO: delete
         virtual void transmissionComplete() override;
         virtual void handleSelfMessage(cMessage *timer) override;
 };
