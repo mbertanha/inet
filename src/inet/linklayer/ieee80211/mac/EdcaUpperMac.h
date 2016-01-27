@@ -59,11 +59,11 @@ class INET_API EdcaUpperMac : public cSimpleModule, public IUpperMac, public ICo
         typedef std::list<Ieee80211DataOrMgmtFrame*> Ieee80211DataOrMgmtFrameList;
 
     protected:
-        IMacParameters *params;
-        MacUtils *utils;
+        IMacParameters *params = nullptr;
+        MacUtils *utils = nullptr;
         Ieee80211Mac *mac = nullptr;
         IRx *rx = nullptr;
-        ITx *tx;
+        ITx *tx = nullptr;
         IContention **contention;
         UpperMacTxRetryHandler **txRetryHandler = nullptr;
 

@@ -59,12 +59,12 @@ class INET_API DcfUpperMac : public cSimpleModule, public IUpperMac, public ICon
         typedef std::list<Ieee80211DataOrMgmtFrame*> Ieee80211DataOrMgmtFrameList;
 
     protected:
-        IMacParameters *params;
-        MacUtils *utils;
+        IMacParameters *params = nullptr;
+        MacUtils *utils = nullptr;
         Ieee80211Mac *mac = nullptr;
         IRx *rx = nullptr;
-        ITx *tx;
-        IContention **contention;
+        ITx *tx = nullptr;
+        IContention **contention = nullptr;
         UpperMacTxRetryHandler *txRetryHandler = nullptr;
 
         int maxQueueSize;

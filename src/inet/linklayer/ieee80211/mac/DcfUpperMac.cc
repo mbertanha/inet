@@ -53,6 +53,9 @@ DcfUpperMac::~DcfUpperMac()
     delete fragmenter;
     delete reassembly;
     delete txRetryHandler;
+    delete params;
+    delete utils;
+    delete [] contention;
 }
 
 void DcfUpperMac::initialize()
