@@ -88,9 +88,15 @@ int UpperMacTxRetryHandler::doubleCw(int cw)
 
 void UpperMacTxRetryHandler::frameTransmissionSucceeded(Ieee80211Frame* frame)
 {
+    bool isGroupAddr = false;
+    if (dynamic_cast<Ieee80211OneAddressFrame*>(frame))
+    {
+        Ieee80211OneAddressFrame *oneAddressFrame = dynamic_cast<Ieee80211OneAddressFrame*>(frame);
+        isGroupAddr = oneAddressFrame->getReceiverAddress().isBroadcast();
+    }
     if (frame->getType() == ST_RTS)
         resetStationSrc();
-    else if (frame->getType() == ST_DATA || frame->getType() == ST_DATA_WITH_QOS)
+    else if (frame->getType() == ST_DATA || frame->getType() == ST_DATA_WITH_QOS || isGroupAddr)
     {
         if (frame->getByteLength() >= params->getRtsThreshold())
             resetStationLrc();
