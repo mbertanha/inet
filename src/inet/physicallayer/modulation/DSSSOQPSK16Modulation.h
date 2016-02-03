@@ -26,6 +26,9 @@ namespace physicallayer {
 
 class INET_API DSSSOQPSK16Modulation : public APSKModulationBase
 {
+protected:
+    static const std::vector<APSKSymbol> constellation;
+
   public:
     DSSSOQPSK16Modulation();
 

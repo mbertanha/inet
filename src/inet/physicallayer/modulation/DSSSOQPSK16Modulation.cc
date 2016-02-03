@@ -21,8 +21,10 @@ namespace inet {
 
 namespace physicallayer {
 
+const std::vector<APSKSymbol> DSSSOQPSK16Modulation::constellation = {};
+
 DSSSOQPSK16Modulation::DSSSOQPSK16Modulation() :
-    APSKModulationBase(nullptr)
+    APSKModulationBase(&constellation)
 {
 }
 
@@ -69,7 +71,8 @@ double DSSSOQPSK16Modulation::calculateBER(double snir, Hz bandwidth, bps bitrat
 
 double DSSSOQPSK16Modulation::calculateSER(double snir, Hz bandwidth, bps bitrate) const
 {
-    throw cRuntimeError("Not yet implemented");
+    return NaN;
+//    throw cRuntimeError("Not yet implemented");
 }
 
 } // namespace physicallayer
